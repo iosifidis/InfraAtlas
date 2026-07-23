@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="el">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>InfraAtlas | Διαχείριση Clusters, VMs & DNS</title>
+    <!-- Google Fonts: Outfit for titles, Inter for body -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="dark-theme">
+
+    <!-- Auth Container: Setup or Login -->
+    <div id="auth-overlay" class="auth-overlay hidden">
+        <div class="auth-box glass">
+            <div class="auth-header">
+                <div class="logo-icon">
+                    <i data-lucide="layers"></i>
+                </div>
+                <h2 id="auth-title">Σύνδεση στο InfraAtlas</h2>
+                <p id="auth-subtitle">Παρακαλώ εισάγετε τα στοιχεία σας.</p>
+            </div>
+            <form id="auth-form">
+                <div class="form-group">
+                    <label for="auth-username">Όνομα χρήστη</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="user"></i>
+                        <input type="text" id="auth-username" required placeholder="π.χ. admin">
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="auth-password">Κωδικός πρόσβασης</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="lock"></i>
+                        <input type="password" id="auth-password" required placeholder="••••••••">
+                    </div>
+                </div>
+                <div id="auth-confirm-group" class="form-group hidden">
+                    <label for="auth-confirm-password">Επιβεβαίωση κωδικού</label>
+                    <div class="input-wrapper">
+                        <i data-lucide="shield-check"></i>
+                        <input type="password" id="auth-confirm-password" placeholder="••••••••">
+                    </div>
+                </div>
+                <button type="submit" id="auth-submit-btn" class="btn btn-primary btn-full">
+                    <span>Είσοδος</span>
+                    <i data-lucide="log-in"></i>
+                </button>
+            </form>
+            <div id="auth-alert" class="alert alert-danger hidden"></div>
+        </div>
+    </div>
+
+    <!-- Main Dashboard Container -->
+    <div id="app-container" class="app-layout hidden">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar glass">
+            <div class="sidebar-brand">
+                <div class="brand-icon">
+                    <i data-lucide="activity"></i>
+                </div>
+                <span class="brand-name">InfraAtlas</span>
+            </div>
+            
+            <nav class="sidebar-menu">
+                <a href="#dashboard" class="menu-item active" data-tab="dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="#clusters" class="menu-item" data-tab="clusters">
+                    <i data-lucide="boxes"></i>
+                    <span>Clusters</span>
+                </a>
+                <a href="#vms" class="menu-item" data-tab="vms">
+                    <i data-lucide="server"></i>
+                    <span>Virtual Machines</span>
+                </a>
+                <a href="#dns" class="menu-item" data-tab="dns">
+                    <i data-lucide="globe"></i>
+                    <span>DNS Records (A & CNAME)</span>
+                </a>
+                <a href="#reports" class="menu-item" data-tab="reports">
+                    <i data-lucide="file-bar-chart"></i>
+                    <span>Αναφορές & Έλεγχος</span>
+                </a>
+                <a href="#settings" class="menu-item" data-tab="settings">
+                    <i data-lucide="settings"></i>
+                    <span>Ρυθμίσεις Φόρμας</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="user-profile" onclick="openProfileModal()" style="cursor: pointer;" title="Στοιχεία Προφίλ & Αλλαγή Κωδικού">
+                    <div class="user-avatar" id="user-avatar-char">A</div>
+                    <div class="user-details">
+                        <span class="user-name" id="user-display-name">Διαχειριστής</span>
+                        <span class="user-role">Profile & Password</span>
+                    </div>
+                </div>
+                <button id="logout-btn" class="btn-logout" title="Αποσύνδεση">
+                    <i data-lucide="log-out"></i>
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="content-header">
+                <div>
+                    <h1 id="page-title">Dashboard</h1>
+                    <p id="page-description" class="text-secondary">Συνολική εικόνα των υποδομών σας.</p>
+                </div>
+                <div class="header-actions">
+                    <div class="status-indicator">
+                        <span class="indicator-dot online"></span>
+                        <span class="status-text">SQLite Online</span>
+                    </div>
+                </div>
+            </header>
+
+            <div class="content-body">
+                <!-- DASHBOARD TAB -->
+                <section id="tab-dashboard" class="tab-pane active">
+                    <!-- Stat Cards Grid -->
+                    <div class="stats-grid">
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-primary"><i data-lucide="boxes"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-label">Clusters</span>
+                                <h3 class="stat-value" id="stat-clusters">0</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-success"><i data-lucide="server"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-label">Συνολικά VMs</span>
+                                <h3 class="stat-value" id="stat-vms">0</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-info"><i data-lucide="play-circle"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-label">Σε Χρήση</span>
+                                <h3 class="stat-value" id="stat-in-use">0</h3>
+                            </div>
+                        </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-danger"><i data-lucide="alert-triangle"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-label">Σημαντικά VMs</span>
+                                <h3 class="stat-value" id="stat-important">0</h3>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Resource Allocation Grid -->
+                    <div class="resources-grid">
+                        <div class="resource-card glass">
+                            <h3>Συνολικοί Πόροι Υποδομής</h3>
+                            <div class="resource-meters">
+                                <div class="meter-group">
+                                    <div class="meter-info">
+                                        <span>CPU Cores</span>
+                                        <strong id="total-cpu-val">0</strong>
+                                    </div>
+                                    <div class="meter-bar"><div class="meter-fill fill-cpu" id="total-cpu-fill" style="width: 0%"></div></div>
+                                </div>
+                                <div class="meter-group">
+                                    <div class="meter-info">
+                                        <span>RAM</span>
+                                        <strong id="total-ram-val">0</strong>
+                                    </div>
+                                    <div class="meter-bar"><div class="meter-fill fill-ram" id="total-ram-fill" style="width: 0%"></div></div>
+                                </div>
+                                <div class="meter-group">
+                                    <div class="meter-info">
+                                        <span>Κύριος Δίσκος</span>
+                                        <strong id="total-disk-val">0</strong>
+                                    </div>
+                                    <div class="meter-bar"><div class="meter-fill fill-disk" id="total-disk-fill" style="width: 0%"></div></div>
+                                </div>
+                                <div class="meter-group">
+                                    <div class="meter-info">
+                                        <span>Extra Δίσκος</span>
+                                        <strong id="total-extradisk-val">0</strong>
+                                    </div>
+                                    <div class="meter-bar"><div class="meter-fill fill-extradisk" id="total-extradisk-fill" style="width: 0%"></div></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="resource-card glass">
+                            <h3>Υπεύθυνα VMs & Επίβλεψη</h3>
+                            <div class="stats-mini-grid">
+                                <div class="mini-stat">
+                                    <span class="mini-val" id="stat-monitored">0</span>
+                                    <span class="mini-label"><i data-lucide="activity"></i> Monitored</span>
+                                </div>
+                                <div class="mini-stat">
+                                    <span class="mini-val" id="stat-internal">0</span>
+                                    <span class="mini-label"><i data-lucide="user-check"></i> Δικά μας (Internal)</span>
+                                </div>
+                            </div>
+                            <div id="alert-zone" class="alert-zone">
+                                <!-- Alerts generated dynamically -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Cluster Resource Distribution Table -->
+                    <div class="card-section glass">
+                        <div class="section-header">
+                            <h2>Κατανομή Πόρων ανά Cluster</h2>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Όνομα Cluster</th>
+                                        <th>VMs</th>
+                                        <th>Σε Χρήση</th>
+                                        <th>Συνολικά CPU</th>
+                                        <th>Συνολική RAM</th>
+                                        <th>Συνολικός Δίσκος</th>
+                                        <th>Δικά μας</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="cluster-resources-tbody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- CLUSTERS TAB -->
+                <section id="tab-clusters" class="tab-pane">
+                    <div class="section-actions">
+                        <button class="btn btn-primary" onclick="openClusterModal()">
+                            <i data-lucide="plus"></i>
+                            <span>Νέο Cluster</span>
+                        </button>
+                    </div>
+
+                    <div class="clusters-grid" id="clusters-container">
+                        <!-- Cluster Cards dynamically added -->
+                    </div>
+                </section>
+
+                <!-- VIRTUAL MACHINES TAB -->
+                <section id="tab-vms" class="tab-pane">
+                    <div class="filter-actions-bar glass">
+                        <div class="filters-row">
+                            <div class="search-box">
+                                <i data-lucide="search"></i>
+                                <input type="text" id="vm-search" placeholder="Αναζήτηση με όνομα, IPv4, IPv6, URL, OS, υπεύθυνο..." oninput="fetchVMs()">
+                            </div>
+                            
+                            <div class="filter-dropdown">
+                                <label for="filter-cluster">Cluster</label>
+                                <select id="filter-cluster" onchange="fetchVMs()">
+                                    <option value="">Όλα</option>
+                                    <!-- Dynamic options -->
+                                </select>
+                            </div>
+
+                            <div class="filter-dropdown">
+                                <label for="filter-in-use">Χρήση</label>
+                                <select id="filter-in-use" onchange="fetchVMs()">
+                                    <option value="">Όλα</option>
+                                    <option value="1">Σε χρήση</option>
+                                    <option value="0">Όχι σε χρήση</option>
+                                </select>
+                            </div>
+
+                            <div class="filter-dropdown">
+                                <label for="filter-important">Σημαντικότητα</label>
+                                <select id="filter-important" onchange="fetchVMs()">
+                                    <option value="">Όλα</option>
+                                    <option value="1">Σημαντικά</option>
+                                    <option value="0">Μη Σημαντικά</option>
+                                </select>
+                            </div>
+
+                            <div class="filter-dropdown">
+                                <label for="filter-monitored">Monitored</label>
+                                <select id="filter-monitored" onchange="fetchVMs()">
+                                    <option value="">Όλα</option>
+                                    <option value="1">Ναι</option>
+                                    <option value="0">Όχι</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="actions-row">
+                            <button class="btn btn-secondary" onclick="openVMImportModal()" style="margin-right: 0.5rem;">
+                                <i data-lucide="file-up"></i>
+                                <span>Εισαγωγή CSV (VMs)</span>
+                            </button>
+                            <button class="btn btn-primary" onclick="openVMModal()">
+                                <i data-lucide="plus"></i>
+                                <span>Νέο VM</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="vms-table-wrapper glass">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Όνομα VM</th>
+                                        <th>Cluster</th>
+                                        <th>Specs (CPU/RAM/Disk)</th>
+                                        <th>IPv4</th>
+                                        <th>Κατάσταση</th>
+                                        <th>Υπεύθυνος</th>
+                                        <th class="actions-col">Ενέργειες</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="vms-tbody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- DNS RECORDS TAB -->
+                <section id="tab-dns" class="tab-pane">
+                    <div class="filter-actions-bar glass">
+                        <div class="filters-row">
+                            <div class="search-box">
+                                <i data-lucide="search"></i>
+                                <input type="text" id="dns-search" placeholder="Αναζήτηση με IP ή Domain / URL..." oninput="fetchDNSRecords()">
+                            </div>
+                            
+                            <div class="filter-dropdown">
+                                <label for="filter-dns-type">Τύπος Εγγραφής</label>
+                                <select id="filter-dns-type" onchange="fetchDNSRecords()">
+                                    <option value="">Όλοι (A & CNAME)</option>
+                                    <option value="A">A Records</option>
+                                    <option value="CNAME">CNAME Records</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="actions-row">
+                            <button class="btn btn-secondary" onclick="openDNSImportModal()" style="margin-right: 0.5rem;">
+                                <i data-lucide="file-up"></i>
+                                <span>Εισαγωγή Zone File</span>
+                            </button>
+                            <button class="btn btn-primary" onclick="openDNSModal()">
+                                <i data-lucide="plus"></i>
+                                <span>Νέα Εγγραφή DNS</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="vms-table-wrapper glass">
+                        <div class="table-container">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th onclick="sortDNSTable('name')" class="sortable-col">
+                                            <span>Domain / Hostname</span>
+                                            <i id="dns-sort-icon-name" data-lucide="arrow-up-down" class="sort-icon"></i>
+                                        </th>
+                                        <th onclick="sortDNSTable('type')" class="sortable-col">
+                                            <span>Τύπος</span>
+                                            <i id="dns-sort-icon-type" data-lucide="arrow-up-down" class="sort-icon"></i>
+                                        </th>
+                                        <th onclick="sortDNSTable('value')" class="sortable-col">
+                                            <span>Τιμή (IP ή CNAME Target)</span>
+                                            <i id="dns-sort-icon-value" data-lucide="arrow-up-down" class="sort-icon"></i>
+                                        </th>
+                                        <th>Σύνδεση με VM</th>
+                                        <th class="actions-col">Ενέργειες</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="dns-tbody">
+                                    <!-- Dynamic DNS rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- REPORTS TAB -->
+                <section id="tab-reports" class="tab-pane">
+                    <div class="report-controls glass">
+                        <h3>Φίλτρα Αναφοράς & Ελέγχου</h3>
+                        <div class="presets-row">
+                            <button class="btn btn-outline" onclick="applyReportPreset('unused-important')">
+                                <i data-lucide="alert-triangle"></i>
+                                <span>Αχρησιμοποίητα Σημαντικά</span>
+                            </button>
+                            <button class="btn btn-outline" onclick="applyReportPreset('external-clients')">
+                                <i data-lucide="users"></i>
+                                <span>Παραχωρημένα σε Τρίτους</span>
+                            </button>
+                            <button class="btn btn-outline" onclick="applyReportPreset('unmonitored')">
+                                <i data-lucide="eye-off"></i>
+                                <span>Χωρίς Monitoring</span>
+                            </button>
+                            <button class="btn btn-outline" onclick="applyReportPreset('all')">
+                                <i data-lucide="list"></i>
+                                <span>Όλα τα VMs</span>
+                            </button>
+                        </div>
+                        <hr class="divider">
+                        <div class="report-options">
+                            <div class="report-filters">
+                                <div class="filter-dropdown">
+                                    <label for="report-cluster">Cluster</label>
+                                    <select id="report-cluster" onchange="runReport()">
+                                        <option value="">Όλα</option>
+                                    </select>
+                                </div>
+                                <div class="filter-dropdown">
+                                    <label for="report-in-use">Σε Χρήση</label>
+                                    <select id="report-in-use" onchange="runReport()">
+                                        <option value="">Όλα</option>
+                                        <option value="1">Ναι</option>
+                                        <option value="0">Όχι</option>
+                                    </select>
+                                </div>
+                                <div class="filter-dropdown">
+                                    <label for="report-important">Σημαντικό</label>
+                                    <select id="report-important" onchange="runReport()">
+                                        <option value="">Όλα</option>
+                                        <option value="1">Ναι</option>
+                                        <option value="0">Όχι</option>
+                                    </select>
+                                </div>
+                                <div class="filter-dropdown">
+                                    <label for="report-used-by-us">Χρήση από Εμάς</label>
+                                    <select id="report-used-by-us" onchange="runReport()">
+                                        <option value="">Όλα</option>
+                                        <option value="1">Εμείς (Internal)</option>
+                                        <option value="0">Τρίτοι (External)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="report-actions">
+                                <button class="btn btn-success" onclick="exportReportCSV()">
+                                    <i data-lucide="download"></i>
+                                    <span>Εξαγωγή CSV (Excel)</span>
+                                </button>
+                                <button class="btn btn-info" onclick="printReport()">
+                                    <i data-lucide="printer"></i>
+                                    <span>Εκτύπωση</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="report-results-wrapper glass">
+                        <div class="section-header">
+                            <h2 id="report-results-title">Αποτελέσματα Αναφοράς</h2>
+                            <span class="badge" id="report-results-count">0 VMs</span>
+                        </div>
+                        <div class="table-container">
+                            <table class="data-table" id="report-table">
+                                <thead>
+                                    <tr>
+                                        <th>Όνομα VM</th>
+                                        <th>Cluster</th>
+                                        <th>Specs</th>
+                                        <th>IPv4</th>
+                                        <th>VPN / Backup</th>
+                                        <th>Σε Χρήση</th>
+                                        <th>Σημαντικό</th>
+                                        <th>Δικό μας</th>
+                                        <th>Υπεύθυνος</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="reports-tbody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- SETTINGS TAB -->
+                <section id="tab-settings" class="tab-pane">
+                    <div class="settings-card glass">
+                        <div class="settings-header">
+                            <i data-lucide="sliders"></i>
+                            <div>
+                                <h3>Προσαρμογή Φόρμας Εισαγωγής (Micro-edit)</h3>
+                                <p class="text-secondary">Επιλέξτε ποια προαιρετικά πεδία επιθυμείτε να εμφανίζονται στη φόρμα καταχώρησης των Virtual Machines.</p>
+                            </div>
+                        </div>
+                        <hr class="divider">
+                        <form id="settings-form" onsubmit="saveSettings(event)">
+                            <div class="toggles-grid">
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-default_password" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Default Συνθηματικό</strong>
+                                        <span>Προεπιλεγμένος κωδικός πρόσβασης VM</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-url" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>URL</strong>
+                                        <span>Σύνδεσμος κονσόλας ή UI διαχείρισης</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-cpu" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>CPU specs</strong>
+                                        <span>Αριθμός CPU Cores</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-ram" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>RAM specs</strong>
+                                        <span>Μέγεθος μνήμης RAM</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-disk" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Δίσκος specs</strong>
+                                        <span>Μέγεθος κύριου σκληρού δίσκου</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-extra_disk" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Extra Δίσκος specs</strong>
+                                        <span>Μέγεθος δευτερεύοντος σκληρού δίσκου</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-ipv4" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Διεύθυνση IPv4</strong>
+                                        <span>Διεύθυνση IPv4 δικτύου</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-ipv6" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Διεύθυνση IPv6</strong>
+                                        <span>Διεύθυνση IPv6 δικτύου</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-vpn" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>VPN σύνδεση</strong>
+                                        <span>Στοιχεία ή κατάσταση πρόσβασης VPN</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-backup" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Backup</strong>
+                                        <span>Κατάσταση ή συχνότητα λήψης backup</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-monitored" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Monitored</strong>
+                                        <span>Ένδειξη αν το VM παρακολουθείται</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-os" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Λειτουργικό Σύστημα (OS)</strong>
+                                        <span>Π.χ. Ubuntu, Debian, Windows</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-os_version" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Έκδοση OS</strong>
+                                        <span>Π.χ. 22.04 LTS, 11 Pro</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-contact_person" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Υπεύθυνος Επικοινωνίας</strong>
+                                        <span>Άτομο επικοινωνίας για παραχωρημένα VM</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-description" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Περιγραφή</strong>
+                                        <span>Ανοικτό κείμενο για σημειώσεις</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="form-actions text-right">
+                                <button type="submit" class="btn btn-primary">
+                                    <i data-lucide="save"></i>
+                                    <span>Αποθήκευση Ρυθμίσεων</span>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- MODAL: Cluster Form -->
+    <div id="cluster-modal" class="modal-overlay hidden">
+        <div class="modal-box glass">
+            <div class="modal-header">
+                <h3 id="cluster-modal-title">Προσθήκη Νέου Cluster</h3>
+                <button class="btn-close" onclick="closeClusterModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="cluster-form" onsubmit="saveCluster(event)">
+                <input type="hidden" id="cluster-id">
+                <div class="form-group">
+                    <label for="cluster-name">Όνομα Cluster *</label>
+                    <input type="text" id="cluster-name" required placeholder="π.χ. Proxmox Main">
+                </div>
+                <div class="form-group">
+                    <label for="cluster-desc">Περιγραφή</label>
+                    <textarea id="cluster-desc" rows="3" placeholder="Σημειώσεις σχετικά με το cluster..."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeClusterModal()">Ακύρωση</button>
+                    <button type="submit" class="btn btn-primary">Αποθήκευση</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: VM Form -->
+    <div id="vm-modal" class="modal-overlay hidden">
+        <div class="modal-box glass modal-large">
+            <div class="modal-header">
+                <h3 id="vm-modal-title">Καταγραφή Νέου VM</h3>
+                <button class="btn-close" onclick="closeVMModal()"><i data-lucide="x"></i></button>
+            </div>
+            
+            <!-- Modal Tabs -->
+            <div class="modal-tabs">
+                <button type="button" class="modal-tab-btn active" data-modaltab="vm-tab-basic">Βασικά Στοιχεία</button>
+                <button type="button" class="modal-tab-btn" data-modaltab="vm-tab-specs">Προδιαγραφές & specs</button>
+                <button type="button" class="modal-tab-btn" data-modaltab="vm-tab-network">Δίκτυο & Συντήρηση</button>
+            </div>
+
+            <form id="vm-form" onsubmit="saveVM(event)">
+                <input type="hidden" id="vm-id">
+                
+                <!-- TAB 1: Basic Info -->
+                <div id="vm-tab-basic" class="modal-tab-content active">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="vm-cluster-id">Cluster *</label>
+                            <select id="vm-cluster-id" required>
+                                <option value="">Επιλέξτε Cluster...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="vm-name">Όνομα VM *</label>
+                            <input type="text" id="vm-name" required placeholder="π.χ. web-server-01">
+                        </div>
+                        <div class="form-group" data-customfield="default_password">
+                            <label for="vm-default-password">Default Συνθηματικό</label>
+                            <input type="text" id="vm-default-password" placeholder="π.χ. AdminP@ss123">
+                        </div>
+                        <div class="form-group" data-customfield="url">
+                            <label for="vm-url">URL Διαχείρισης</label>
+                            <input type="url" id="vm-url" placeholder="https://proxmox:8006">
+                        </div>
+                        <div class="form-group" data-customfield="os">
+                            <label for="vm-os">Λειτουργικό Σύστημα (OS)</label>
+                            <input type="text" id="vm-os" placeholder="π.χ. Ubuntu">
+                        </div>
+                        <div class="form-group" data-customfield="os_version">
+                            <label for="vm-os-version">Έκδοση OS</label>
+                            <input type="text" id="vm-os-version" placeholder="π.χ. 22.04 LTS">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 2: Hardware Specs -->
+                <div id="vm-tab-specs" class="modal-tab-content">
+                    <div class="form-grid">
+                        <div class="form-group" data-customfield="cpu">
+                            <label for="vm-cpu">CPU Cores</label>
+                            <input type="number" id="vm-cpu" min="0" step="any" placeholder="π.χ. 4">
+                        </div>
+                        <div class="form-group" data-customfield="ram">
+                            <label for="vm-ram">RAM Specs</label>
+                            <input type="number" id="vm-ram" min="0" step="any" placeholder="π.χ. 8">
+                        </div>
+                        <div class="form-group" data-customfield="disk">
+                            <label for="vm-disk">Κύριος Δίσκος Specs</label>
+                            <input type="number" id="vm-disk" min="0" step="any" placeholder="π.χ. 100">
+                        </div>
+                        <div class="form-group" data-customfield="extra_disk">
+                            <label for="vm-extra-disk">Extra Δίσκος Specs</label>
+                            <input type="number" id="vm-extra-disk" min="0" step="any" placeholder="π.χ. 50">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- TAB 3: Network & Maintenance -->
+                <div id="vm-tab-network" class="modal-tab-content">
+                    <div class="form-grid">
+                        <div class="form-group" data-customfield="ipv4">
+                            <label for="vm-ipv4">Διεύθυνση IPv4</label>
+                            <input type="text" id="vm-ipv4" placeholder="π.χ. 192.168.1.50">
+                        </div>
+                        <div class="form-group" data-customfield="ipv6">
+                            <label for="vm-ipv6">Διεύθυνση IPv6</label>
+                            <input type="text" id="vm-ipv6" placeholder="π.χ. fe80::...">
+                        </div>
+                        <div class="form-group" data-customfield="vpn">
+                            <label for="vm-vpn">VPN Σύνδεση (Status/Σημειώσεις)</label>
+                            <input type="text" id="vm-vpn" placeholder="π.ex. OpenVPN Client Configured">
+                        </div>
+                        <div class="form-group" data-customfield="backup">
+                            <label for="vm-backup">Backup Scheme</label>
+                            <input type="text" id="vm-backup" placeholder="π.χ. Daily Proxmox Backup Server">
+                        </div>
+                        <div class="form-group" data-customfield="contact_person">
+                            <label for="vm-contact">Υπεύθυνος Επικοινωνίας</label>
+                            <input type="text" id="vm-contact" placeholder="π.χ. Γιώργος Παπαδόπουλος">
+                        </div>
+                    </div>
+                    
+                    <div class="checkboxes-group">
+                        <div class="checkbox-control">
+                            <label class="switch switch-small">
+                                <input type="checkbox" id="vm-in-use" checked>
+                                <span class="slider"></span>
+                            </label>
+                            <span>Σε Χρήση</span>
+                        </div>
+                        <div class="checkbox-control">
+                            <label class="switch switch-small">
+                                <input type="checkbox" id="vm-is-important">
+                                <span class="slider"></span>
+                            </label>
+                            <span>Σημαντικό VM</span>
+                        </div>
+                        <div class="checkbox-control">
+                            <label class="switch switch-small">
+                                <input type="checkbox" id="vm-used-by-us" checked>
+                                <span class="slider"></span>
+                            </label>
+                            <span>Χρήση από Εμάς (Internal)</span>
+                        </div>
+                        <div class="checkbox-control" data-customfield="monitored">
+                            <label class="switch switch-small">
+                                <input type="checkbox" id="vm-monitored">
+                                <span class="slider"></span>
+                            </label>
+                            <span>Monitored (Παρακολουθείται)</span>
+                        </div>
+                    </div>
+
+                    <div class="form-group mt-3" data-customfield="description">
+                        <label for="vm-desc">Περιγραφή</label>
+                        <textarea id="vm-desc" rows="3" placeholder="Σημειώσεις και τεχνικές λεπτομέρειες..."></textarea>
+                    </div>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeVMModal()">Ακύρωση</button>
+                    <button type="submit" class="btn btn-primary">Αποθήκευση</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: DNS Record Form -->
+    <div id="dns-modal" class="modal-overlay hidden">
+        <div class="modal-box glass">
+            <div class="modal-header">
+                <h3 id="dns-modal-title">Προσθήκη Εγγραφής DNS</h3>
+                <button class="btn-close" onclick="closeDNSModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="dns-form" onsubmit="saveDNSRecord(event)">
+                <input type="hidden" id="dns-id">
+                <div class="form-group">
+                    <label for="dns-name">Domain / Hostname *</label>
+                    <input type="text" id="dns-name" required placeholder="π.χ. web.ellak.gr">
+                </div>
+                <div class="form-group">
+                    <label for="dns-type">Τύπος Εγγραφής *</label>
+                    <select id="dns-type" required>
+                        <option value="A">A Record (IPv4 Address)</option>
+                        <option value="CNAME">CNAME Record (Alias Domain)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="dns-value">Τιμή / Target *</label>
+                    <input type="text" id="dns-value" required placeholder="IP (π.χ. 83.212.171.7) ή CNAME target (π.χ. ellak.gr)">
+                </div>
+                <div class="form-group">
+                    <label for="dns-desc">Περιγραφή / Σημειώσεις</label>
+                    <textarea id="dns-desc" rows="2" placeholder="Προαιρετική περιγραφή..."></textarea>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeDNSModal()">Ακύρωση</button>
+                    <button type="submit" class="btn btn-primary">Αποθήκευση</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Import DNS Zone File -->
+    <div id="dns-import-modal" class="modal-overlay hidden">
+        <div class="modal-box glass modal-large">
+            <div class="modal-header">
+                <h3>Εισαγωγή Zone File DNS (BIND Format)</h3>
+                <button class="btn-close" onclick="closeDNSImportModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="dns-import-form" onsubmit="submitDNSImport(event)">
+                <div class="form-group">
+                    <label for="dns-file-input">Επιλέξτε Αρχείο Zone File (.txt / zonefile)</label>
+                    <input type="file" id="dns-file-input" accept=".txt,.zone,.cap">
+                </div>
+                <div style="text-align: center; margin: 0.5rem 0; color: var(--text-muted); font-size: 0.85rem;">— Η επικολλούμενο κείμενο zonefile —</div>
+                <div class="form-group">
+                    <label for="dns-paste-input">Περιεχόμενο Zone File</label>
+                    <textarea id="dns-paste-input" rows="8" placeholder="Επικολλήστε εδώ τις εγγραφές του zonefile... (π.χ. web.ellak.gr. 86400 IN A 83.212.171.7)"></textarea>
+                </div>
+                <div id="dns-import-alert" class="alert hidden" style="margin-top: 1rem;"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeDNSImportModal()">Ακύρωση</button>
+                    <button type="submit" class="btn btn-success">
+                        <i data-lucide="file-up"></i>
+                        <span>Εισαγωγή & Αναγνώριση</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: User Profile & Password Change -->
+    <div id="profile-modal" class="modal-overlay hidden">
+        <div class="modal-box glass">
+            <div class="modal-header">
+                <h3>Στοιχεία Προφίλ & Αλλαγή Κωδικού</h3>
+                <button class="btn-close" onclick="closeProfileModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="profile-form" onsubmit="submitProfileUpdate(event)">
+                <div class="form-group">
+                    <label for="profile-username">Όνομα Χρήστη (Username)</label>
+                    <input type="text" id="profile-username" required placeholder="admin">
+                </div>
+                <div class="form-group">
+                    <label for="profile-current-password">Τρέχων Κωδικός Πρόσβασης (απαιτείται)</label>
+                    <input type="password" id="profile-current-password" required placeholder="••••••••">
+                </div>
+                <div class="divider"><span>Αλλαγή Κωδικού (Προαιρετικά)</span></div>
+                <div class="form-group">
+                    <label for="profile-new-password">Νέος Κωδικός Πρόσβασης</label>
+                    <input type="password" id="profile-new-password" placeholder="Αφήστε το κενό αν δεν θέλετε αλλαγή">
+                </div>
+                <div class="form-group">
+                    <label for="profile-confirm-password">Επιβεβαίωση Νέου Κωδικού</label>
+                    <input type="password" id="profile-confirm-password" placeholder="Επαναλάβετε το νέο κωδικό">
+                </div>
+                <div id="profile-alert" class="alert hidden" style="margin-top: 1rem;"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeProfileModal()">Ακύρωση</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i data-lucide="save"></i>
+                        <span>Αποθήκευση Αλλαγών</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Import VM CSV File -->
+    <div id="vm-import-modal" class="modal-overlay hidden">
+        <div class="modal-box glass modal-large">
+            <div class="modal-header">
+                <h3>Εισαγωγή VMs από αρχείο CSV</h3>
+                <button class="btn-close" onclick="closeVMImportModal()"><i data-lucide="x"></i></button>
+            </div>
+            <form id="vm-import-form" onsubmit="submitVMImport(event)">
+                <div class="form-group">
+                    <label for="vm-file-input">Επιλογή αρχείου CSV (π.χ. ΕΕΛΛΑΚ-systems.ods.csv)</label>
+                    <input type="file" id="vm-file-input" accept=".csv,.txt">
+                </div>
+                <div class="divider"><span>ή Επικόλληση Περιεχομένου</span></div>
+                <div class="form-group">
+                    <label for="vm-paste-input">Περιεχόμενο CSV</label>
+                    <textarea id="vm-paste-input" rows="8" placeholder="Επικολλήστε εδώ τις γραμμές του CSV..."></textarea>
+                </div>
+                <div id="vm-import-alert" class="alert hidden" style="margin-top: 1rem;"></div>
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeVMImportModal()">Ακύρωση</button>
+                    <button type="submit" class="btn btn-success">
+                        <i data-lucide="file-up"></i>
+                        <span>Εισαγωγή VMs</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: Confirmation Delete -->
+    <div id="delete-modal" class="modal-overlay hidden">
+        <div class="modal-box glass modal-alert">
+            <div class="modal-header">
+                <h3>Επιβεβαίωση Διαγραφής</h3>
+                <button class="btn-close" onclick="closeDeleteModal()"><i data-lucide="x"></i></button>
+            </div>
+            <div class="modal-body">
+                <i data-lucide="alert-triangle" class="alert-icon-large text-danger"></i>
+                <p id="delete-modal-message">Είστε σίγουροι ότι θέλετε να προχωρήσετε στη διαγραφή; Αυτή η ενέργεια είναι οριστική και δεν μπορεί να αναιρεθεί.</p>
+            </div>
+            <div class="modal-actions">
+                <button type="button" class="btn btn-outline" onclick="closeDeleteModal()">Ακύρωση</button>
+                <button type="button" id="delete-confirm-btn" class="btn btn-danger">Διαγραφή</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
