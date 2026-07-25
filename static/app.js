@@ -254,8 +254,8 @@ function switchTab(tabId) {
             runReport();
             break;
         case 'settings':
-            pageTitle.textContent = 'Ρυθμίσεις Φόρμας';
-            pageDesc.textContent = 'Προσαρμογή των εμφανιζόμενων πεδίων εισαγωγής.';
+            pageTitle.textContent = 'Ρυθμίσεις';
+            pageDesc.textContent = 'Διαχείριση χωρητικότητας υποδομών και προσαρμογή πεδίων φόρμας.';
             break;
     }
 }
@@ -325,17 +325,27 @@ function fetchVMs() {
 // -------------------------------------------------------------
 
 function applySettingsToUI() {
-    // 1. Sync toggle switches in the Settings panel
+    // 1. Sync capacity input values in Settings panel
+    const capCpu = document.getElementById('setting-capacity_cpu');
+    const capRam = document.getElementById('setting-capacity_ram');
+    const capDisk = document.getElementById('setting-capacity_disk');
+    const capIps = document.getElementById('setting-capacity_ips');
+
+    if (capCpu) capCpu.value = state.settings.capacity_cpu || '';
+    if (capRam) capRam.value = state.settings.capacity_ram || '';
+    if (capDisk) capDisk.value = state.settings.capacity_disk || '';
+    if (capIps) capIps.value = state.settings.capacity_ips || '';
+
+    // 2. Sync toggle switches in the Settings panel
     defaultFields.forEach(field => {
         const toggle = document.getElementById(`field-${field}`);
         if (toggle) {
-            // Checked if not disabled (defaults to checked if not explicitly configured as "0" or "false")
             const isVisible = state.settings[field] !== '0';
             toggle.checked = isVisible;
         }
     });
 
-    // 2. Adjust visibility of fields inside the VM Modal Form
+    // 3. Adjust visibility of fields inside the VM Modal Form
     defaultFields.forEach(field => {
         const isVisible = state.settings[field] !== '0';
         const formFields = document.querySelectorAll(`[data-customfield="${field}"]`);
@@ -347,12 +357,28 @@ function applySettingsToUI() {
             }
         });
     });
+
+    if (state.stats) {
+        renderStatsDashboard();
+    }
 }
 
 function saveSettings(e) {
     e.preventDefault();
     const payload = {};
     
+    // Collect capacity limit inputs
+    const capCpu = document.getElementById('setting-capacity_cpu');
+    const capRam = document.getElementById('setting-capacity_ram');
+    const capDisk = document.getElementById('setting-capacity_disk');
+    const capIps = document.getElementById('setting-capacity_ips');
+
+    if (capCpu) payload['capacity_cpu'] = capCpu.value.trim();
+    if (capRam) payload['capacity_ram'] = capRam.value.trim();
+    if (capDisk) payload['capacity_disk'] = capDisk.value.trim();
+    if (capIps) payload['capacity_ips'] = capIps.value.trim();
+
+    // Collect form field toggles
     defaultFields.forEach(field => {
         const toggle = document.getElementById(`field-${field}`);
         if (toggle) {
@@ -369,7 +395,8 @@ function saveSettings(e) {
     .then(data => {
         state.settings = payload;
         applySettingsToUI();
-        alert("Οι ρυθμίσεις της φόρμας αποθηκεύτηκαν με επιτυχία!");
+        fetchStats();
+        alert("Οι ρυθμίσεις αποθηκεύτηκαν με επιτυχία!");
     })
     .catch(err => alert("Αποτυχία αποθήκευσης ρυθμίσεων: " + err));
 }
@@ -390,37 +417,66 @@ function renderStatsDashboard() {
     document.getElementById('stat-monitored').textContent = stats.monitored_vms || 0;
     document.getElementById('stat-internal').textContent = stats.used_by_us_vms || 0;
 
-    // Resource calculations: Progress bar shows portion allocated to "In Use" VMs vs all VMs.
-    // However, since total_cpu represents sum of all VMs, let's render totals.
-    // For visual aesthetics, we can represent progress bars as (in-use resources / total resources).
-    // Let's first retrieve total sums.
-    document.getElementById('total-cpu-val').textContent = (stats.total_cpu || 0).toFixed(1);
-    document.getElementById('total-ram-val').textContent = (stats.total_ram || 0).toFixed(1);
-    document.getElementById('total-disk-val').textContent = (stats.total_disk || 0).toFixed(1);
-    document.getElementById('total-extradisk-val').textContent = (stats.total_extra_disk || 0).toFixed(1);
+    // Resource totals across all VMs
+    const allocatedCPU = stats.total_cpu || 0;
+    const allocatedRAM = stats.total_ram || 0;
+    const allocatedDisk = (stats.total_disk || 0) + (stats.total_extra_disk || 0);
 
-    // Calculate In-Use specs percentages
-    let inUseCPU = 0, inUseRAM = 0, inUseDisk = 0, inUseExtraDisk = 0;
-    
-    // We can compute this client-side from state.vms
-    state.vms.forEach(v => {
-        if (v.in_use === 1) {
-            inUseCPU += v.cpu;
-            inUseRAM += v.ram;
-            inUseDisk += v.disk;
-            inUseExtraDisk += v.extra_disk;
-        }
+    // Count non-empty IPv4 addresses used across VMs
+    let usedIPs = 0;
+    (state.vms || []).forEach(v => {
+        if (v.ipv4 && v.ipv4.trim() !== '') usedIPs++;
     });
 
-    const cpuPct = stats.total_cpu > 0 ? (inUseCPU / stats.total_cpu) * 100 : 0;
-    const ramPct = stats.total_ram > 0 ? (inUseRAM / stats.total_ram) * 100 : 0;
-    const diskPct = stats.total_disk > 0 ? (inUseDisk / stats.total_disk) * 100 : 0;
-    const extraDiskPct = stats.total_extra_disk > 0 ? (inUseExtraDisk / stats.total_extra_disk) * 100 : 0;
+    // Capacity limits set in settings
+    const maxCPU = parseFloat(state.settings.capacity_cpu) || 0;
+    const maxRAM = parseFloat(state.settings.capacity_ram) || 0;
+    const maxDisk = parseFloat(state.settings.capacity_disk) || 0;
+    const maxIPs = parseFloat(state.settings.capacity_ips) || 0;
 
-    document.getElementById('total-cpu-fill').style.width = `${cpuPct}%`;
-    document.getElementById('total-ram-fill').style.width = `${ramPct}%`;
-    document.getElementById('total-disk-fill').style.width = `${diskPct}%`;
-    document.getElementById('total-extradisk-fill').style.width = `${extraDiskPct}%`;
+    // Render CPU Meter
+    if (maxCPU > 0) {
+        const cpuPct = Math.min(100, (allocatedCPU / maxCPU) * 100);
+        document.getElementById('total-cpu-val').textContent = `${allocatedCPU.toFixed(1)} / ${maxCPU} Cores (${cpuPct.toFixed(1)}%)`;
+        document.getElementById('total-cpu-fill').style.width = `${cpuPct}%`;
+    } else {
+        document.getElementById('total-cpu-val').textContent = `${allocatedCPU.toFixed(1)} Cores`;
+        document.getElementById('total-cpu-fill').style.width = `100%`;
+    }
+
+    // Render RAM Meter
+    if (maxRAM > 0) {
+        const ramPct = Math.min(100, (allocatedRAM / maxRAM) * 100);
+        document.getElementById('total-ram-val').textContent = `${allocatedRAM.toFixed(1)} / ${maxRAM} GB (${ramPct.toFixed(1)}%)`;
+        document.getElementById('total-ram-fill').style.width = `${ramPct}%`;
+    } else {
+        document.getElementById('total-ram-val').textContent = `${allocatedRAM.toFixed(1)} GB`;
+        document.getElementById('total-ram-fill').style.width = `100%`;
+    }
+
+    // Render DISK Meter
+    if (maxDisk > 0) {
+        const diskPct = Math.min(100, (allocatedDisk / maxDisk) * 100);
+        document.getElementById('total-disk-val').textContent = `${allocatedDisk.toFixed(1)} / ${maxDisk} GB (${diskPct.toFixed(1)}%)`;
+        document.getElementById('total-disk-fill').style.width = `${diskPct}%`;
+    } else {
+        document.getElementById('total-disk-val').textContent = `${allocatedDisk.toFixed(1)} GB`;
+        document.getElementById('total-disk-fill').style.width = `100%`;
+    }
+
+    // Render IP Meter
+    const elIpVal = document.getElementById('total-ips-val');
+    const elIpFill = document.getElementById('total-ips-fill');
+    if (elIpVal && elIpFill) {
+        if (maxIPs > 0) {
+            const ipPct = Math.min(100, (usedIPs / maxIPs) * 100);
+            elIpVal.textContent = `${usedIPs} / ${maxIPs} IPs (${ipPct.toFixed(1)}%)`;
+            elIpFill.style.width = `${ipPct}%`;
+        } else {
+            elIpVal.textContent = `${usedIPs} IPs`;
+            elIpFill.style.width = `100%`;
+        }
+    }
 
     // Smart Warnings Generator
     const alertZone = document.getElementById('alert-zone');

@@ -93,7 +93,7 @@
                 </a>
                 <a href="#settings" class="menu-item" data-tab="settings">
                     <i data-lucide="settings"></i>
-                    <span>Ρυθμίσεις Φόρμας</span>
+                    <span>Ρυθμίσεις</span>
                 </a>
             </nav>
 
@@ -165,7 +165,7 @@
                     <!-- Resource Allocation Grid -->
                     <div class="resources-grid">
                         <div class="resource-card glass">
-                            <h3>Συνολικοί Πόροι Υποδομής</h3>
+                            <h3>Συνολική Χρήση & Χωρητικότητα Υποδομής</h3>
                             <div class="resource-meters">
                                 <div class="meter-group">
                                     <div class="meter-info">
@@ -178,7 +178,7 @@
                                 </div>
                                 <div class="meter-group">
                                     <div class="meter-info">
-                                        <span>RAM</span>
+                                        <span>RAM (GB)</span>
                                         <strong id="total-ram-val">0</strong>
                                     </div>
                                     <div class="meter-bar">
@@ -187,7 +187,7 @@
                                 </div>
                                 <div class="meter-group">
                                     <div class="meter-info">
-                                        <span>Κύριος Δίσκος</span>
+                                        <span>Συνολικός Δίσκος / DISK (GB)</span>
                                         <strong id="total-disk-val">0</strong>
                                     </div>
                                     <div class="meter-bar">
@@ -196,12 +196,11 @@
                                 </div>
                                 <div class="meter-group">
                                     <div class="meter-info">
-                                        <span>Extra Δίσκος</span>
-                                        <strong id="total-extradisk-val">0</strong>
+                                        <span>Διευθύνσεις IP</span>
+                                        <strong id="total-ips-val">0</strong>
                                     </div>
                                     <div class="meter-bar">
-                                        <div class="meter-fill fill-extradisk" id="total-extradisk-fill"
-                                            style="width: 0%"></div>
+                                        <div class="meter-fill fill-ips" id="total-ips-fill" style="width: 0%"></div>
                                     </div>
                                 </div>
                             </div>
@@ -519,17 +518,59 @@
 
                 <!-- SETTINGS TAB -->
                 <section id="tab-settings" class="tab-pane">
-                    <div class="settings-card glass">
-                        <div class="settings-header">
-                            <i data-lucide="sliders"></i>
-                            <div>
-                                <h3>Προσαρμογή Φόρμας Εισαγωγής (Micro-edit)</h3>
-                                <p class="text-secondary">Επιλέξτε ποια προαιρετικά πεδία επιθυμείτε να εμφανίζονται στη
-                                    φόρμα καταχώρησης των Virtual Machines.</p>
+                    <form id="settings-form" onsubmit="saveSettings(event)">
+                        <!-- Infrastructure Capacity Settings -->
+                        <div class="settings-card glass" style="margin-bottom: 1.5rem;">
+                            <div class="settings-header">
+                                <i data-lucide="cpu"></i>
+                                <div>
+                                    <h3>Συνολική Χωρητικότητα Υποδομής (Capacity Limits)</h3>
+                                    <p class="text-secondary">Εισάγετε τα συνολικά διαθέσιμα όρια πόρων (CPU, RAM, DISK, IPs) της υποδομής σας για τον αυτόματο υπολογισμό ποσοστών χρήσης στο Dashboard.</p>
+                                </div>
+                            </div>
+                            <hr class="divider">
+                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1.25rem;">
+                                <div class="form-group">
+                                    <label for="setting-capacity_cpu" style="display:flex; align-items:center; gap:6px; font-weight:600; margin-bottom:6px;">
+                                        <i data-lucide="cpu" style="width:16px; height:16px; color:var(--primary);"></i>
+                                        <span>Συνολικές CPU (vCPUs)</span>
+                                    </label>
+                                    <input type="number" id="setting-capacity_cpu" class="form-input" min="0" step="1" placeholder="Π.χ. 128">
+                                </div>
+                                <div class="form-group">
+                                    <label for="setting-capacity_ram" style="display:flex; align-items:center; gap:6px; font-weight:600; margin-bottom:6px;">
+                                        <i data-lucide="database" style="width:16px; height:16px; color:var(--success);"></i>
+                                        <span>Συνολική RAM (GB)</span>
+                                    </label>
+                                    <input type="number" id="setting-capacity_ram" class="form-input" min="0" step="1" placeholder="Π.χ. 512">
+                                </div>
+                                <div class="form-group">
+                                    <label for="setting-capacity_disk" style="display:flex; align-items:center; gap:6px; font-weight:600; margin-bottom:6px;">
+                                        <i data-lucide="hard-drive" style="width:16px; height:16px; color:var(--info);"></i>
+                                        <span>Συνολικός Δίσκος / DISK (GB)</span>
+                                    </label>
+                                    <input type="number" id="setting-capacity_disk" class="form-input" min="0" step="1" placeholder="Π.χ. 10000">
+                                </div>
+                                <div class="form-group">
+                                    <label for="setting-capacity_ips" style="display:flex; align-items:center; gap:6px; font-weight:600; margin-bottom:6px;">
+                                        <i data-lucide="globe" style="width:16px; height:16px; color:var(--warning);"></i>
+                                        <span>Συνολικές IP Διευθύνσεις</span>
+                                    </label>
+                                    <input type="number" id="setting-capacity_ips" class="form-input" min="0" step="1" placeholder="Π.χ. 254">
+                                </div>
                             </div>
                         </div>
-                        <hr class="divider">
-                        <form id="settings-form" onsubmit="saveSettings(event)">
+
+                        <!-- Micro-edit Form Field Customization -->
+                        <div class="settings-card glass">
+                            <div class="settings-header">
+                                <i data-lucide="sliders"></i>
+                                <div>
+                                    <h3>Προσαρμογή Φόρμας Εισαγωγής (Micro-edit)</h3>
+                                    <p class="text-secondary">Επιλέξτε ποια προαιρετικά πεδία επιθυμείτε να εμφανίζονται στη φόρμα καταχώρησης των Virtual Machines.</p>
+                                </div>
+                            </div>
+                            <hr class="divider">
                             <div class="toggles-grid">
                                 <div class="toggle-control">
                                     <label class="switch">
@@ -682,14 +723,14 @@
                                     </div>
                                 </div>
                             </div>
-                            <div class="form-actions text-right">
+                            <div class="form-actions text-right" style="margin-top: 1.5rem;">
                                 <button type="submit" class="btn btn-primary">
                                     <i data-lucide="save"></i>
                                     <span>Αποθήκευση Ρυθμίσεων</span>
                                 </button>
                             </div>
-                        </form>
-                    </div>
+                        </div>
+                    </form>
                 </section>
             </div>
         </main>

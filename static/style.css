@@ -785,6 +785,7 @@ input:checked + .switch-small .slider:before {
 .fill-ram { background: var(--success); }
 .fill-disk { background: var(--info); }
 .fill-extradisk { background: var(--warning); }
+.fill-ips { background: #a855f7; }
 
 .stats-mini-grid {
     display: grid;
