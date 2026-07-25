@@ -1295,8 +1295,42 @@ input:checked + .switch-small .slider:before {
 }
 
 /* -------------------------------------------------------------
-   Responsive Design & Mobile Menu
+   Responsive Design & Mobile Layout
    ------------------------------------------------------------- */
+.mobile-chevron-icon {
+    display: none;
+}
+
+.clickable-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.clickable-row:hover {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+.vm-name-title {
+    font-weight: 600;
+    color: #ffffff;
+}
+
+.vm-url-sub {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.2rem;
+}
+
+.vm-url-sub a {
+    color: var(--primary-light, #60a5fa);
+    text-decoration: underline;
+}
+
+.no-url-text {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
 @media (max-width: 768px) {
     .app-layout {
         flex-direction: column;
@@ -1314,30 +1348,125 @@ input:checked + .switch-small .slider:before {
     .sidebar-menu {
         flex-direction: row;
         overflow-x: auto;
-        padding: 0.75rem 1rem;
+        padding: 0.5rem 0.75rem;
         gap: 0.5rem;
+        justify-content: flex-start;
     }
     
+    .menu-item {
+        flex-direction: column;
+        gap: 0.2rem;
+        padding: 0.4rem 0.65rem;
+        font-size: 0.7rem;
+        text-align: center;
+        white-space: nowrap;
+    }
+
     .menu-item span {
-        display: none;
+        display: inline-block !important;
+        font-size: 0.7rem;
     }
     
     .sidebar-footer {
-        padding: 0.75rem 1rem;
+        padding: 0.5rem 1rem;
     }
     
     .main-content {
         margin-left: 0;
-        padding: 1.25rem;
+        padding: 1rem;
     }
     
     .content-header {
         flex-direction: column;
-        gap: 1rem;
+        align-items: flex-start;
+        gap: 0.75rem;
     }
     
     .stats-grid {
         grid-template-columns: repeat(2, 1fr);
+        gap: 0.75rem;
+    }
+
+    .filter-actions-bar {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0.75rem;
+    }
+
+    .filter-actions-bar .search-box {
+        min-width: 100%;
+    }
+
+    .filter-actions-bar .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Responsive Virtual Machines Table */
+    .vms-table-wrapper .data-table thead tr th:nth-child(n+2) {
+        display: none !important;
+    }
+    
+    .vms-table-wrapper .data-table thead tr th:first-child {
+        width: 100% !important;
+        display: block !important;
+        box-sizing: border-box;
+    }
+
+    .vms-table-wrapper .data-table tbody tr td:nth-child(n+2) {
+        display: none !important;
+    }
+
+    .vms-table-wrapper .data-table tbody tr {
+        display: block !important;
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.25rem 0;
+        cursor: pointer;
+    }
+
+    .vms-table-wrapper .data-table tbody tr td:first-child {
+        width: 100% !important;
+        display: block !important;
+        padding: 0.75rem 1rem !important;
+        box-sizing: border-box;
+    }
+
+    .vm-row-flex {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        width: 100%;
+    }
+
+    .vm-main-details {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+    }
+
+    .vm-name-title {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #ffffff;
+    }
+
+    .vm-url-sub {
+        font-size: 0.8125rem;
+    }
+
+    .mobile-chevron-icon {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        color: var(--primary);
+        font-size: 1.1rem;
+        opacity: 0.8;
+    }
+
+    .mobile-chevron-icon svg {
+        width: 20px;
+        height: 20px;
     }
 }
 
@@ -1348,6 +1477,9 @@ input:checked + .switch-small .slider:before {
     
     .modal-box {
         padding: 1.25rem;
+        width: 95%;
+        max-height: 90vh;
+        overflow-y: auto;
     }
     
     .form-grid {

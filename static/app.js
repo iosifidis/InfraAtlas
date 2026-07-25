@@ -630,6 +630,12 @@ function renderVMs() {
 
     state.vms.forEach(v => {
         const row = document.createElement('tr');
+        row.classList.add('vm-table-row', 'clickable-row');
+        row.setAttribute('title', 'Κάντε κλικ για προβολή / επεξεργασία VM');
+        row.onclick = (e) => {
+            if (e.target.closest('a') || e.target.closest('button')) return;
+            openVMModal(v.id);
+        };
         
         // Badges elements
         let badgesHtml = '';
@@ -642,25 +648,32 @@ function renderVMs() {
         const specsText = `CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}${v.extra_disk > 0 ? ' +' + v.extra_disk : ''}`;
 
         row.innerHTML = `
-            <td>
-                <div style="font-weight: 600; color: #ffffff;">${escapeHTML(v.name)}</div>
-                <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 0.2rem;">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" style="text-decoration:underline;">${escapeHTML(v.url)}</a>` : ''}</div>
+            <td class="col-vm-info">
+                <div class="vm-row-flex">
+                    <div class="vm-main-details">
+                        <div class="vm-name-title">${escapeHTML(v.name)}</div>
+                        <div class="vm-url-sub">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
+                    </div>
+                    <div class="mobile-chevron-icon">
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                </div>
             </td>
-            <td><span class="badge badge-info">${escapeHTML(v.cluster_name)}</span></td>
-            <td><span style="font-size:0.8125rem;">${specsText}</span></td>
-            <td><code style="font-size: 0.8125rem;">${escapeHTML(v.ipv4 || '-')}</code></td>
-            <td>
-                <div style="display:flex; align-items:center; gap:0.4rem;">
+            <td class="col-cluster"><span class="badge badge-info">${escapeHTML(v.cluster_name)}</span></td>
+            <td class="col-specs"><span style="font-size:0.8125rem;">${specsText}</span></td>
+            <td class="col-ipv4"><code style="font-size: 0.8125rem;">${escapeHTML(v.ipv4 || '-')}</code></td>
+            <td class="col-status">
+                <div style="display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap;">
                     <span class="indicator-dot ${v.in_use === 1 ? 'online' : ''}" style="background-color: ${v.in_use === 1 ? 'var(--success)' : 'var(--text-muted)'};"></span>
                     <span style="font-size: 0.8125rem;">${v.in_use === 1 ? 'Σε Χρήση' : 'Ανενεργό'}</span>
                     ${badgesHtml}
                 </div>
             </td>
-            <td><span style="font-size:0.8125rem;">${escapeHTML(v.contact_person || 'Εμείς')}</span></td>
-            <td class="actions-col">
+            <td class="col-contact"><span style="font-size:0.8125rem;">${escapeHTML(v.contact_person || 'Εμείς')}</span></td>
+            <td class="actions-col col-actions">
                 <div class="table-actions">
-                    <button class="btn-icon-only" onclick="openVMModal(${v.id})" title="Επεξεργασία"><i data-lucide="edit-3"></i></button>
-                    <button class="btn-icon-only text-danger" onclick="openDeleteModal('vm', ${v.id})" title="Διαγραφή"><i data-lucide="trash-2"></i></button>
+                    <button class="btn-icon-only" onclick="event.stopPropagation(); openVMModal(${v.id})" title="Επεξεργασία"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only text-danger" onclick="event.stopPropagation(); openDeleteModal('vm', ${v.id})" title="Διαγραφή"><i data-lucide="trash-2"></i></button>
                 </div>
             </td>
         `;
