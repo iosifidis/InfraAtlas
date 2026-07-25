@@ -39,7 +39,9 @@ type VM struct {
 	IPv6            string    `json:"ipv6"`
 	VPN             string    `json:"vpn"`
 	Backup          string    `json:"backup"`
-	Monitored       int       `json:"monitored"` // 0 or 1
+	Monitored       int       `json:"monitored"`   // 0 or 1
+	OSUpgrade       int       `json:"os_upgrade"`  // 0 or 1
+	AppUpgrade      int       `json:"app_upgrade"` // 0 or 1
 	OS              string    `json:"os"`
 	OSVersion       string    `json:"os_version"`
 	ContactPerson   string    `json:"contact_person"`
@@ -121,6 +123,8 @@ func migrate() error {
 			vpn TEXT,
 			backup TEXT,
 			monitored INTEGER DEFAULT 0,
+			os_upgrade INTEGER DEFAULT 0,
+			app_upgrade INTEGER DEFAULT 0,
 			os TEXT,
 			os_version TEXT,
 			contact_person TEXT,
@@ -158,6 +162,10 @@ func migrate() error {
 			return err
 		}
 	}
+
+	// Auto-migrations for new columns on existing database files
+	DB.Exec("ALTER TABLE vms ADD COLUMN os_upgrade INTEGER DEFAULT 0;")
+	DB.Exec("ALTER TABLE vms ADD COLUMN app_upgrade INTEGER DEFAULT 0;")
 
 	return nil
 }
@@ -260,7 +268,7 @@ func GetVMs(clusterID int64, inUse *int, isImportant *int, monitored *int, searc
 	query := `
 		SELECT v.id, v.cluster_id, c.name as cluster_name, v.name, v.default_password, v.url, 
 		       v.in_use, v.is_important, v.used_by_us, v.cpu, v.ram, v.disk, v.extra_disk, 
-		       v.ipv4, v.ipv6, v.vpn, v.backup, v.monitored, v.os, v.os_version, 
+		       v.ipv4, v.ipv6, v.vpn, v.backup, v.monitored, v.os_upgrade, v.app_upgrade, v.os, v.os_version, 
 		       v.contact_person, v.description, v.created_at, v.updated_at
 		FROM vms v
 		JOIN clusters c ON v.cluster_id = c.id
@@ -305,7 +313,7 @@ func GetVMs(clusterID int64, inUse *int, isImportant *int, monitored *int, searc
 		err := rows.Scan(
 			&v.ID, &v.ClusterID, &v.ClusterName, &v.Name, &pass, &url,
 			&v.InUse, &v.IsImportant, &v.UsedByUs, &v.CPU, &v.RAM, &v.Disk, &v.ExtraDisk,
-			&ipv4, &ipv6, &vpn, &backup, &v.Monitored, &os, &osVer,
+			&ipv4, &ipv6, &vpn, &backup, &v.Monitored, &v.OSUpgrade, &v.AppUpgrade, &os, &osVer,
 			&contact, &desc, &v.CreatedAt, &v.UpdatedAt,
 		)
 		if err != nil {
@@ -332,7 +340,7 @@ func GetVM(id int64) (VM, error) {
 	query := `
 		SELECT v.id, v.cluster_id, c.name as cluster_name, v.name, v.default_password, v.url, 
 		       v.in_use, v.is_important, v.used_by_us, v.cpu, v.ram, v.disk, v.extra_disk, 
-		       v.ipv4, v.ipv6, v.vpn, v.backup, v.monitored, v.os, v.os_version, 
+		       v.ipv4, v.ipv6, v.vpn, v.backup, v.monitored, v.os_upgrade, v.app_upgrade, v.os, v.os_version, 
 		       v.contact_person, v.description, v.created_at, v.updated_at
 		FROM vms v
 		JOIN clusters c ON v.cluster_id = c.id
@@ -341,7 +349,7 @@ func GetVM(id int64) (VM, error) {
 	err := DB.QueryRow(query, id).Scan(
 		&v.ID, &v.ClusterID, &v.ClusterName, &v.Name, &pass, &url,
 		&v.InUse, &v.IsImportant, &v.UsedByUs, &v.CPU, &v.RAM, &v.Disk, &v.ExtraDisk,
-		&ipv4, &ipv6, &vpn, &backup, &v.Monitored, &os, &osVer,
+		&ipv4, &ipv6, &vpn, &backup, &v.Monitored, &v.OSUpgrade, &v.AppUpgrade, &os, &osVer,
 		&contact, &desc, &v.CreatedAt, &v.UpdatedAt,
 	)
 	if err != nil {
@@ -364,13 +372,13 @@ func CreateVM(v *VM) error {
 	query := `
 		INSERT INTO vms (
 			cluster_id, name, default_password, url, in_use, is_important, used_by_us,
-			cpu, ram, disk, extra_disk, ipv4, ipv6, vpn, backup, monitored, 
+			cpu, ram, disk, extra_disk, ipv4, ipv6, vpn, backup, monitored, os_upgrade, app_upgrade,
 			os, os_version, contact_person, description, updated_at
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`
 	res, err := DB.Exec(query,
 		v.ClusterID, v.Name, v.DefaultPassword, v.URL, v.InUse, v.IsImportant, v.UsedByUs,
-		v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored,
+		v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored, v.OSUpgrade, v.AppUpgrade,
 		v.OS, v.OSVersion, v.ContactPerson, v.Description,
 	)
 	if err != nil {
@@ -384,13 +392,13 @@ func UpdateVM(v *VM) error {
 	query := `
 		UPDATE vms SET 
 			cluster_id = ?, name = ?, default_password = ?, url = ?, in_use = ?, is_important = ?, used_by_us = ?,
-			cpu = ?, ram = ?, disk = ?, extra_disk = ?, ipv4 = ?, ipv6 = ?, vpn = ?, backup = ?, monitored = ?, 
+			cpu = ?, ram = ?, disk = ?, extra_disk = ?, ipv4 = ?, ipv6 = ?, vpn = ?, backup = ?, monitored = ?, os_upgrade = ?, app_upgrade = ?, 
 			os = ?, os_version = ?, contact_person = ?, description = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
 	_, err := DB.Exec(query,
 		v.ClusterID, v.Name, v.DefaultPassword, v.URL, v.InUse, v.IsImportant, v.UsedByUs,
-		v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored,
+		v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored, v.OSUpgrade, v.AppUpgrade,
 		v.OS, v.OSVersion, v.ContactPerson, v.Description, v.ID,
 	)
 	return err

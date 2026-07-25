@@ -19,7 +19,7 @@ const state = {
 // Default Form Customization Settings (if not configured in DB)
 const defaultFields = [
     'default_password', 'url', 'cpu', 'ram', 'disk', 'extra_disk',
-    'ipv4', 'ipv6', 'vpn', 'backup', 'monitored', 'os', 'os_version',
+    'ipv4', 'ipv6', 'vpn', 'backup', 'monitored', 'os_upgrade', 'app_upgrade', 'os', 'os_version',
     'contact_person', 'description'
 ];
 
@@ -627,6 +627,8 @@ function renderVMs() {
         let badgesHtml = '';
         if (v.is_important === 1) badgesHtml += '<span class="badge badge-danger" style="margin-left:4px;">Important</span>';
         if (v.monitored === 1) badgesHtml += '<span class="badge badge-info" style="margin-left:4px;">Monitored</span>';
+        if (v.os_upgrade === 1) badgesHtml += '<span class="badge badge-warning" style="margin-left:4px;" title="Αναβάθμιση Λειτουργικού">OS Upgr</span>';
+        if (v.app_upgrade === 1) badgesHtml += '<span class="badge badge-primary" style="margin-left:4px;" title="Αναβάθμιση Λογισμικού">App Upgr</span>';
         if (v.used_by_us === 0) badgesHtml += '<span class="badge badge-warning" style="margin-left:4px;">Client</span>';
 
         const specsText = `CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}${v.extra_disk > 0 ? ' +' + v.extra_disk : ''}`;
@@ -770,6 +772,8 @@ function openVMModal(id = null) {
                 document.getElementById('vm-is-important').checked = v.is_important === 1;
                 document.getElementById('vm-used-by-us').checked = v.used_by_us === 1;
                 document.getElementById('vm-monitored').checked = v.monitored === 1;
+                document.getElementById('vm-os-upgrade').checked = v.os_upgrade === 1;
+                document.getElementById('vm-app-upgrade').checked = v.app_upgrade === 1;
                 
                 modal.classList.remove('hidden');
             })
@@ -777,6 +781,9 @@ function openVMModal(id = null) {
     } else {
         title.textContent = 'Καταγραφή Νέου Virtual Machine';
         
+        document.getElementById('vm-os-upgrade').checked = false;
+        document.getElementById('vm-app-upgrade').checked = false;
+
         // Pre-select active cluster filter if any
         const activeClusterFilter = document.getElementById('filter-cluster').value;
         if (activeClusterFilter) {
@@ -824,7 +831,9 @@ function saveVM(e) {
         in_use: document.getElementById('vm-in-use').checked ? 1 : 0,
         is_important: document.getElementById('vm-is-important').checked ? 1 : 0,
         used_by_us: document.getElementById('vm-used-by-us').checked ? 1 : 0,
-        monitored: document.getElementById('vm-monitored').checked ? 1 : 0
+        monitored: document.getElementById('vm-monitored').checked ? 1 : 0,
+        os_upgrade: document.getElementById('vm-os-upgrade').checked ? 1 : 0,
+        app_upgrade: document.getElementById('vm-app-upgrade').checked ? 1 : 0
     };
 
     const method = id ? 'PUT' : 'POST';

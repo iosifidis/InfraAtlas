@@ -684,6 +684,26 @@
                                 </div>
                                 <div class="toggle-control">
                                     <label class="switch">
+                                        <input type="checkbox" id="field-os_upgrade" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Αναβάθμιση λειτουργικού</strong>
+                                        <span>Ένδειξη εκκρεμούσας αναβάθμισης OS</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
+                                        <input type="checkbox" id="field-app_upgrade" checked>
+                                        <span class="slider"></span>
+                                    </label>
+                                    <div class="toggle-label">
+                                        <strong>Αναβάθμιση λογισμικού</strong>
+                                        <span>Ένδειξη εκκρεμούσας αναβάθμισης εφαρμογής/software</span>
+                                    </div>
+                                </div>
+                                <div class="toggle-control">
+                                    <label class="switch">
                                         <input type="checkbox" id="field-os" checked>
                                         <span class="slider"></span>
                                     </label>
@@ -885,7 +905,21 @@
                                 <input type="checkbox" id="vm-monitored">
                                 <span class="slider"></span>
                             </label>
-                            <span>Monitored (Παρακολουθείται)</span>
+                            <span>Monitored</span>
+                        </div>
+                        <div class="checkbox-control" data-customfield="os_upgrade">
+                            <label class="switch switch-small">
+                                <input type="checkbox" id="vm-os-upgrade">
+                                <span class="slider"></span>
+                            </label>
+                            <span>Αναβάθμιση λειτουργικού</span>
+                        </div>
+                        <div class="checkbox-control" data-customfield="app_upgrade">
+                            <label class="switch switch-small">
+                                <input type="checkbox" id="vm-app-upgrade">
+                                <span class="slider"></span>
+                            </label>
+                            <span>Αναβάθμιση λογισμικού</span>
                         </div>
                     </div>
 
