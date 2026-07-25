@@ -1263,7 +1263,7 @@ function isVMMatchedToDNS(v, dnsRecords) {
             if (dnsNameHost && (vmHost === dnsNameHost || dnsNameHost.endsWith('.' + vmHost) || vmHost.endsWith('.' + dnsNameHost))) {
                 return true;
             }
-            if (r.type === 'CNAME' && dnsValHost && (vmHost === dnsValHost || dnsValHost.endsWith('.' + dnsValHost) || vmHost.endsWith('.' + dnsValHost))) {
+            if (r.type === 'CNAME' && dnsValHost && (vmHost === dnsValHost || dnsValHost.endsWith('.' + vmHost) || vmHost.endsWith('.' + dnsValHost))) {
                 return true;
             }
         }
@@ -1372,7 +1372,7 @@ function renderUnmatchedDNSTable(records) {
     const resultsTitle = document.getElementById('report-results-title');
     const resultsCount = document.getElementById('report-results-count');
 
-    resultsTitle.textContent = 'Εγγραφές DNS Χωρίς VM (Υποψήφιες για Διαγραφή)';
+    resultsTitle.textContent = 'Εγγραφές DNS Χωρίς VM';
     resultsCount.textContent = `${records.length} Εγγραφές DNS`;
 
     thead.innerHTML = `
@@ -1416,7 +1416,7 @@ function renderUnmatchedDNSTable(records) {
             <td><span class="badge ${r.type === 'A' ? 'badge-info' : 'badge-warning'}">${escapeHTML(r.type)}</span></td>
             <td><code>${escapeHTML(r.value)}</code></td>
             <td><span style="font-size:0.8125rem; color:var(--text-secondary);">Δεν βρέθηκε VM με αυτή την IP ή URL</span></td>
-            <td><span class="badge badge-danger">Υποψήφιο για Διαγραφή DNS</span></td>
+            <td><span class="badge badge-warning">Χωρίς VM</span></td>
             <td class="actions-col">
                 <button class="btn-icon-only text-danger" onclick="event.stopPropagation(); openDeleteModal('dns', ${r.id})" title="Διαγραφή Εγγραφής DNS"><i data-lucide="trash-2"></i></button>
             </td>
@@ -1434,7 +1434,7 @@ function renderUnmatchedVMsTable(vms) {
     const resultsTitle = document.getElementById('report-results-title');
     const resultsCount = document.getElementById('report-results-count');
 
-    resultsTitle.textContent = 'Virtual Machines Χωρίς Εγγραφή DNS (Υποψήφια για Διαγραφή)';
+    resultsTitle.textContent = 'Virtual Machines Χωρίς Εγγραφή DNS';
     resultsCount.textContent = `${vms.length} VMs`;
 
     thead.innerHTML = `
@@ -1478,7 +1478,7 @@ function renderUnmatchedVMsTable(vms) {
             <td><span class="badge badge-info">${escapeHTML(v.cluster_name)}</span></td>
             <td><code>${escapeHTML(v.ipv4 || v.ipv6 || '-')}</code></td>
             <td><span style="font-size:0.8125rem;">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '-'}</span></td>
-            <td><span class="badge badge-danger">Υποψήφιο για Διαγραφή VM</span></td>
+            <td><span class="badge badge-warning">Χωρίς DNS</span></td>
             <td class="actions-col">
                 <button class="btn-icon-only text-danger" onclick="event.stopPropagation(); openDeleteModal('vm', ${v.id})" title="Διαγραφή VM"><i data-lucide="trash-2"></i></button>
             </td>
