@@ -1170,10 +1170,11 @@ function normalizeHost(str) {
     if (!str) return '';
     let s = str.trim().toLowerCase();
     s = s.replace(/^https?:\/\//, '');
+    s = s.replace(/[\/\?#].*$/, '');
     s = s.replace(/:\d+$/, '');
-    s = s.replace(/[\/\.]+$/, '');
     s = s.replace(/^www\./, '');
-    return s;
+    s = s.replace(/\.$/, '');
+    return s.trim();
 }
 
 function normalizeIP(ip) {
@@ -1181,7 +1182,20 @@ function normalizeIP(ip) {
     return ip.trim().toLowerCase();
 }
 
+function extractHostsFromURL(urlStr) {
+    if (!urlStr) return [];
+    const parts = urlStr.split(/[\s,;]+/);
+    const hosts = [];
+    parts.forEach(p => {
+        const h = normalizeHost(p);
+        if (h) hosts.push(h);
+    });
+    return hosts;
+}
+
 function isDNSRecordMatchedToVM(r, vms) {
+    if (!vms || !Array.isArray(vms)) return false;
+
     const dnsValIP = normalizeIP(r.value);
     const dnsNameHost = normalizeHost(r.name);
     const dnsValHost = normalizeHost(r.value);
@@ -1189,30 +1203,22 @@ function isDNSRecordMatchedToVM(r, vms) {
     for (const v of vms) {
         const vmIPv4 = normalizeIP(v.ipv4);
         const vmIPv6 = normalizeIP(v.ipv6);
-        const vmURLHost = normalizeHost(v.url);
-        const vmNameHost = normalizeHost(v.name);
 
-        // 1. IP Matching (for A records or IP targets)
+        // 1. Primary Check: IP Matching (for A records or IP targets)
         if (dnsValIP && ((vmIPv4 && dnsValIP === vmIPv4) || (vmIPv6 && dnsValIP === vmIPv6))) {
             return true;
         }
 
-        // 2. Hostname / URL Matching
-        if (dnsNameHost) {
-            if (vmURLHost && (dnsNameHost === vmURLHost || dnsNameHost.includes(vmURLHost) || vmURLHost.includes(dnsNameHost))) {
+        // 2. Secondary Check: Domain / Hostname Matching against VM URL
+        const vmHosts = extractHostsFromURL(v.url);
+        for (const vmHost of vmHosts) {
+            if (!vmHost) continue;
+            // Match DNS record name with VM URL domain
+            if (dnsNameHost && (dnsNameHost === vmHost || dnsNameHost.endsWith('.' + vmHost) || vmHost.endsWith('.' + dnsNameHost))) {
                 return true;
             }
-            if (vmNameHost && (dnsNameHost === vmNameHost || dnsNameHost.includes(vmNameHost) || vmNameHost.includes(dnsNameHost))) {
-                return true;
-            }
-        }
-
-        // 3. CNAME Target Host Matching
-        if (r.type === 'CNAME' && dnsValHost) {
-            if (vmURLHost && (dnsValHost === vmURLHost || dnsValHost.includes(vmURLHost) || vmURLHost.includes(dnsValHost))) {
-                return true;
-            }
-            if (vmNameHost && (dnsValHost === vmNameHost || dnsValHost.includes(vmNameHost) || vmNameHost.includes(dnsNameHost))) {
+            // Match CNAME target value with VM URL domain
+            if (r.type === 'CNAME' && dnsValHost && (dnsValHost === vmHost || dnsValHost.endsWith('.' + vmHost) || vmHost.endsWith('.' + dnsValHost))) {
                 return true;
             }
         }
@@ -1222,10 +1228,11 @@ function isDNSRecordMatchedToVM(r, vms) {
 }
 
 function isVMMatchedToDNS(v, dnsRecords) {
+    if (!dnsRecords || !Array.isArray(dnsRecords)) return false;
+
     const vmIPv4 = normalizeIP(v.ipv4);
     const vmIPv6 = normalizeIP(v.ipv6);
-    const vmURLHost = normalizeHost(v.url);
-    const vmNameHost = normalizeHost(v.name);
+    const vmHosts = extractHostsFromURL(v.url);
 
     for (const r of dnsRecords) {
         const dnsValIP = normalizeIP(r.value);
@@ -1237,24 +1244,18 @@ function isVMMatchedToDNS(v, dnsRecords) {
             return true;
         }
 
-        // Match URL / Hostname
-        if (vmURLHost) {
-            if (dnsNameHost && (vmURLHost === dnsNameHost || vmURLHost.includes(dnsNameHost) || dnsNameHost.includes(vmURLHost))) {
+        // 2. Secondary Check: Domain / Host Match
+        for (const vmHost of vmHosts) {
+            if (!vmHost) continue;
+            if (dnsNameHost && (vmHost === dnsNameHost || dnsNameHost.endsWith('.' + vmHost) || vmHost.endsWith('.' + dnsNameHost))) {
                 return true;
             }
-            if (dnsValHost && (vmURLHost === dnsValHost || vmURLHost.includes(dnsValHost) || dnsValHost.includes(vmURLHost))) {
+            if (r.type === 'CNAME' && dnsValHost && (vmHost === dnsValHost || dnsValHost.endsWith('.' + dnsValHost) || vmHost.endsWith('.' + dnsValHost))) {
                 return true;
             }
         }
 
-        if (vmNameHost) {
-            if (dnsNameHost && (vmNameHost === dnsNameHost || vmNameHost.includes(dnsNameHost) || dnsNameHost.includes(vmNameHost))) {
-                return true;
-            }
-            if (dnsValHost && (vmNameHost === dnsValHost || vmNameHost.includes(dnsValHost) || dnsValHost.includes(vmNameHost))) {
-                return true;
-            }
-        }
+
     }
 
     return false;
