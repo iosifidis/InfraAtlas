@@ -11,7 +11,7 @@ RUN go mod download
 COPY . .
 
 # Compile a static binary without CGO dependency
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o vm-dashboard .
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o infraatlas .
 
 # Stage 2: Create a minimal production image
 FROM alpine:latest
@@ -22,7 +22,7 @@ RUN apk --no-cache add ca-certificates tzdata
 WORKDIR /app
 
 # Copy the static binary from builder stage
-COPY --from=builder /build/vm-dashboard /app/vm-dashboard
+COPY --from=builder /build/infraatlas /app/infraatlas
 
 # Create the data directory for SQLite bind volume
 RUN mkdir -p /app/data
@@ -31,4 +31,4 @@ RUN mkdir -p /app/data
 EXPOSE 8080
 
 # Execute server using defaults pointing to the persistent mount
-ENTRYPOINT ["/app/vm-dashboard", "-db", "/app/data/dashboard.db", "-port", "8080"]
+ENTRYPOINT ["/app/infraatlas", "-db", "/app/data/dashboard.db", "-port", "8080"]

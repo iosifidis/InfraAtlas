@@ -1,11 +1,11 @@
 #version: '3.8'
 
 services:
-  vm-dashboard:
+  infraatlas:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: vm-dashboard
+    container_name: infraatlas
     ports:
       - "8080:8080"
     volumes:

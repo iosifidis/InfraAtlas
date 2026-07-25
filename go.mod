@@ -1,4 +1,4 @@
-module vm-dashboard
+module infraatlas
 
 go 1.25.0
 
