@@ -1,0 +1,29 @@
+# Database & Data files
+data/*
+!data/.gitkeep
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Go Executables & Binaries
+/vm-dashboard
+*.exe
+*.exe?
+*.dll
+*.so
+*.dylib
+
+# Environment & Temp Files
+.env
+cookies.txt
+*.tmp
+*.log
+
+# OS / Editor Files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
