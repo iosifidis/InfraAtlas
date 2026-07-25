@@ -341,7 +341,7 @@ func GetVM(id int64) (VM, error) {
 	err := DB.QueryRow(query, id).Scan(
 		&v.ID, &v.ClusterID, &v.ClusterName, &v.Name, &pass, &url,
 		&v.InUse, &v.IsImportant, &v.UsedByUs, &v.CPU, &v.RAM, &v.Disk, &v.ExtraDisk,
-		&ipv4, &ipv6, &vpn, &backup, &v.Monitored, &os, &v.OSVersion,
+		&ipv4, &ipv6, &vpn, &backup, &v.Monitored, &os, &osVer,
 		&contact, &desc, &v.CreatedAt, &v.UpdatedAt,
 	)
 	if err != nil {

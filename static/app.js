@@ -1091,7 +1091,101 @@ function linkDNSToVM(val, hostname) {
 // Report Generator Page Logic
 // -------------------------------------------------------------
 
-function applyReportPreset(preset) {
+function normalizeHost(str) {
+    if (!str) return '';
+    let s = str.trim().toLowerCase();
+    s = s.replace(/^https?:\/\//, '');
+    s = s.replace(/:\d+$/, '');
+    s = s.replace(/[\/\.]+$/, '');
+    s = s.replace(/^www\./, '');
+    return s;
+}
+
+function normalizeIP(ip) {
+    if (!ip) return '';
+    return ip.trim().toLowerCase();
+}
+
+function isDNSRecordMatchedToVM(r, vms) {
+    const dnsValIP = normalizeIP(r.value);
+    const dnsNameHost = normalizeHost(r.name);
+    const dnsValHost = normalizeHost(r.value);
+
+    for (const v of vms) {
+        const vmIPv4 = normalizeIP(v.ipv4);
+        const vmIPv6 = normalizeIP(v.ipv6);
+        const vmURLHost = normalizeHost(v.url);
+        const vmNameHost = normalizeHost(v.name);
+
+        // 1. IP Matching (for A records or IP targets)
+        if (dnsValIP && ((vmIPv4 && dnsValIP === vmIPv4) || (vmIPv6 && dnsValIP === vmIPv6))) {
+            return true;
+        }
+
+        // 2. Hostname / URL Matching
+        if (dnsNameHost) {
+            if (vmURLHost && (dnsNameHost === vmURLHost || dnsNameHost.includes(vmURLHost) || vmURLHost.includes(dnsNameHost))) {
+                return true;
+            }
+            if (vmNameHost && (dnsNameHost === vmNameHost || dnsNameHost.includes(vmNameHost) || vmNameHost.includes(dnsNameHost))) {
+                return true;
+            }
+        }
+
+        // 3. CNAME Target Host Matching
+        if (r.type === 'CNAME' && dnsValHost) {
+            if (vmURLHost && (dnsValHost === vmURLHost || dnsValHost.includes(vmURLHost) || vmURLHost.includes(dnsValHost))) {
+                return true;
+            }
+            if (vmNameHost && (dnsValHost === vmNameHost || dnsValHost.includes(vmNameHost) || vmNameHost.includes(dnsNameHost))) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function isVMMatchedToDNS(v, dnsRecords) {
+    const vmIPv4 = normalizeIP(v.ipv4);
+    const vmIPv6 = normalizeIP(v.ipv6);
+    const vmURLHost = normalizeHost(v.url);
+    const vmNameHost = normalizeHost(v.name);
+
+    for (const r of dnsRecords) {
+        const dnsValIP = normalizeIP(r.value);
+        const dnsNameHost = normalizeHost(r.name);
+        const dnsValHost = normalizeHost(r.value);
+
+        // Match IP
+        if (dnsValIP && ((vmIPv4 && dnsValIP === vmIPv4) || (vmIPv6 && dnsValIP === vmIPv6))) {
+            return true;
+        }
+
+        // Match URL / Hostname
+        if (vmURLHost) {
+            if (dnsNameHost && (vmURLHost === dnsNameHost || vmURLHost.includes(dnsNameHost) || dnsNameHost.includes(vmURLHost))) {
+                return true;
+            }
+            if (dnsValHost && (vmURLHost === dnsValHost || vmURLHost.includes(dnsValHost) || dnsValHost.includes(vmURLHost))) {
+                return true;
+            }
+        }
+
+        if (vmNameHost) {
+            if (dnsNameHost && (vmNameHost === dnsNameHost || vmNameHost.includes(dnsNameHost) || dnsNameHost.includes(vmNameHost))) {
+                return true;
+            }
+            if (dnsValHost && (vmNameHost === dnsValHost || vmNameHost.includes(dnsValHost) || dnsValHost.includes(vmNameHost))) {
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+function applyReportPreset(preset, btnElem) {
     // Reset all filter options
     document.getElementById('report-cluster').value = '';
     document.getElementById('report-in-use').value = '';
@@ -1103,24 +1197,18 @@ function applyReportPreset(preset) {
         btn.classList.remove('active');
     });
 
+    if (btnElem) {
+        btnElem.classList.add('active');
+    }
+
     // Apply specific preset configurations
     if (preset === 'unused-important') {
         document.getElementById('report-in-use').value = '0';
         document.getElementById('report-important').value = '1';
-        event.currentTarget.classList.add('active');
     } else if (preset === 'external-clients') {
         document.getElementById('report-used-by-us').value = '0';
-        event.currentTarget.classList.add('active');
     } else if (preset === 'unmonitored') {
-        document.getElementById('report-important').value = '1'; // Unmonitored checks are typically critical for important VMs
-        // In the app preset, let's select all unmonitored instead
         document.getElementById('report-important').value = '';
-        // Wait, unmonitored doesn't have an option in report fields directly.
-        // We will fetch VMs and filter clientside or add a parameter.
-        // Let's filter clientside or just load all and display unmonitored!
-        event.currentTarget.classList.add('active');
-    } else if (preset === 'all') {
-        event.currentTarget.classList.add('active');
     }
     
     state.activeReportPreset = preset;
@@ -1132,6 +1220,38 @@ function runReport() {
     const inUse = document.getElementById('report-in-use').value;
     const important = document.getElementById('report-important').value;
     const usedByUs = document.getElementById('report-used-by-us').value;
+
+    if (state.activeReportPreset === 'unmatched-dns') {
+        Promise.all([
+            fetch('/api/vms').then(r => r.json()),
+            fetch('/api/dns').then(r => r.json())
+        ])
+        .then(([vms, dnsRecords]) => {
+            const unmatchedDNS = (dnsRecords || []).filter(r => !isDNSRecordMatchedToVM(r, vms || []));
+            renderUnmatchedDNSTable(unmatchedDNS);
+        })
+        .catch(err => console.error("Error running unmatched DNS report:", err));
+        return;
+    }
+
+    if (state.activeReportPreset === 'unmatched-vms') {
+        Promise.all([
+            fetch('/api/vms').then(r => r.json()),
+            fetch('/api/dns').then(r => r.json())
+        ])
+        .then(([vms, dnsRecords]) => {
+            let unmatchedVMs = (vms || []).filter(v => !isVMMatchedToDNS(v, dnsRecords || []));
+            
+            if (clusterId) unmatchedVMs = unmatchedVMs.filter(v => v.cluster_id === parseInt(clusterId));
+            if (inUse !== '') unmatchedVMs = unmatchedVMs.filter(v => v.in_use === parseInt(inUse));
+            if (important !== '') unmatchedVMs = unmatchedVMs.filter(v => v.is_important === parseInt(important));
+            if (usedByUs !== '') unmatchedVMs = unmatchedVMs.filter(v => v.used_by_us === parseInt(usedByUs));
+
+            renderUnmatchedVMsTable(unmatchedVMs);
+        })
+        .catch(err => console.error("Error running unmatched VMs report:", err));
+        return;
+    }
 
     let queryParams = [];
     if (clusterId) queryParams.push(`cluster_id=${clusterId}`);
@@ -1145,7 +1265,6 @@ function runReport() {
         .then(data => {
             let vms = data || [];
             
-            // Client-side filtering for specific presets
             if (state.activeReportPreset === 'unmonitored') {
                 vms = vms.filter(v => v.monitored === 0);
             }
@@ -1158,13 +1277,120 @@ function runReport() {
         .catch(err => console.error("Error running report:", err));
 }
 
-function renderReportTable(vms) {
+function renderUnmatchedDNSTable(records) {
+    const thead = document.querySelector('#report-table thead');
     const tbody = document.getElementById('reports-tbody');
+    const resultsTitle = document.getElementById('report-results-title');
+    const resultsCount = document.getElementById('report-results-count');
+
+    resultsTitle.textContent = 'Εγγραφές DNS Χωρίς VM (Υποψήφιες για Διαγραφή)';
+    resultsCount.textContent = `${records.length} Εγγραφές DNS`;
+
+    thead.innerHTML = `
+        <tr>
+            <th>Domain / Hostname</th>
+            <th>Τύπος</th>
+            <th>Τιμή (IP / Target)</th>
+            <th>Αιτιολογία Ελέγχου</th>
+            <th>Κατάσταση</th>
+            <th class="actions-col">Ενέργειες</th>
+        </tr>
+    `;
+
+    tbody.innerHTML = '';
+
+    if (records.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-secondary" style="text-align: center; padding: 2rem;">Όλες οι εγγραφές DNS αντιστοιχούν σε κάποιο Virtual Machine!</td></tr>`;
+        return;
+    }
+
+    records.forEach(r => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${escapeHTML(r.name)}</strong></td>
+            <td><span class="badge ${r.type === 'A' ? 'badge-info' : 'badge-warning'}">${escapeHTML(r.type)}</span></td>
+            <td><code>${escapeHTML(r.value)}</code></td>
+            <td><span style="font-size:0.8125rem; color:var(--text-secondary);">Δεν βρέθηκε VM με αυτή την IP ή URL</span></td>
+            <td><span class="badge badge-danger">Υποψήφιο για Διαγραφή DNS</span></td>
+            <td class="actions-col">
+                <button class="btn-icon-only text-danger" onclick="openDeleteModal('dns', ${r.id})" title="Διαγραφή Εγγραφής DNS"><i data-lucide="trash-2"></i></button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    lucide.createIcons();
+    state.currentReportData = records;
+}
+
+function renderUnmatchedVMsTable(vms) {
+    const thead = document.querySelector('#report-table thead');
+    const tbody = document.getElementById('reports-tbody');
+    const resultsTitle = document.getElementById('report-results-title');
+    const resultsCount = document.getElementById('report-results-count');
+
+    resultsTitle.textContent = 'Virtual Machines Χωρίς Εγγραφή DNS (Υποψήφια για Διαγραφή)';
+    resultsCount.textContent = `${vms.length} VMs`;
+
+    thead.innerHTML = `
+        <tr>
+            <th>Όνομα VM</th>
+            <th>Cluster</th>
+            <th>IPv4 / IPv6</th>
+            <th>URL / Domain</th>
+            <th>Κατάσταση</th>
+            <th class="actions-col">Ενέργειες</th>
+        </tr>
+    `;
+
+    tbody.innerHTML = '';
+
+    if (vms.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-secondary" style="text-align: center; padding: 2rem;">Όλα τα Virtual Machines αντιστοιχούν σε κάποια εγγραφή DNS!</td></tr>`;
+        return;
+    }
+
+    vms.forEach(v => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${escapeHTML(v.name)}</strong></td>
+            <td><span class="badge badge-info">${escapeHTML(v.cluster_name)}</span></td>
+            <td><code>${escapeHTML(v.ipv4 || v.ipv6 || '-')}</code></td>
+            <td><span style="font-size:0.8125rem;">${v.url ? escapeHTML(v.url) : '-'}</span></td>
+            <td><span class="badge badge-danger">Υποψήφιο για Διαγραφή VM</span></td>
+            <td class="actions-col">
+                <button class="btn-icon-only text-danger" onclick="openDeleteModal('vm', ${v.id})" title="Διαγραφή VM"><i data-lucide="trash-2"></i></button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    lucide.createIcons();
+    state.currentReportData = vms;
+}
+
+function renderReportTable(vms) {
+    const thead = document.querySelector('#report-table thead');
+    const tbody = document.getElementById('reports-tbody');
+    
+    thead.innerHTML = `
+        <tr>
+            <th>Όνομα VM</th>
+            <th>Cluster</th>
+            <th>Specs</th>
+            <th>IPv4</th>
+            <th>VPN / Backup</th>
+            <th>Σε Χρήση</th>
+            <th>Σημαντικό</th>
+            <th>Δικό μας</th>
+            <th>Υπεύθυνος</th>
+        </tr>
+    `;
+
     tbody.innerHTML = '';
     
     document.getElementById('report-results-count').textContent = `${vms.length} VMs`;
 
-    // Title label updates based on preset
     const resultsTitle = document.getElementById('report-results-title');
     if (state.activeReportPreset === 'unused-important') {
         resultsTitle.textContent = 'Ανενεργά Σημαντικά VMs (Προς Έλεγχο/Διαγραφή)';
@@ -1201,19 +1427,48 @@ function renderReportTable(vms) {
         `;
         tbody.appendChild(row);
     });
+
+    state.currentReportData = vms;
 }
 
 function exportReportCSV() {
+    if (state.activeReportPreset === 'unmatched-dns' || state.activeReportPreset === 'unmatched-vms') {
+        const items = state.currentReportData || [];
+        if (items.length === 0) {
+            alert('Δεν υπάρχουν δεδομένα προς εξαγωγή.');
+            return;
+        }
+        let csvContent = 'data:text/csv;charset=utf-8,\uFEFF';
+        if (state.activeReportPreset === 'unmatched-dns') {
+            csvContent += 'Domain / Hostname,Type,Value,Audit Status\n';
+            items.forEach(r => {
+                csvContent += `"${r.name}","${r.type}","${r.value}","Unmatched DNS - Candidate for Deletion"\n`;
+            });
+        } else {
+            csvContent += 'VM Name,Cluster,IPv4,IPv6,URL,Audit Status\n';
+            items.forEach(v => {
+                csvContent += `"${v.name}","${v.cluster_name}","${v.ipv4 || ''}","${v.ipv6 || ''}","${v.url || ''}","Unmatched VM - Candidate for Deletion"\n`;
+            });
+        }
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement('a');
+        link.setAttribute('href', encodedUri);
+        link.setAttribute('download', `report_${state.activeReportPreset}_${new Date().toISOString().slice(0,10)}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+    }
+
     const clusterId = document.getElementById('report-cluster').value;
     const inUse = document.getElementById('report-in-use').value;
     const important = document.getElementById('report-important').value;
-    // Note: CSV API will export matching VMs
+    
     let queryParams = [];
     if (clusterId) queryParams.push(`cluster_id=${clusterId}`);
     if (inUse !== '') queryParams.push(`in_use=${inUse}`);
     if (important !== '') queryParams.push(`is_important=${important}`);
     
-    // We open download link
     const url = '/api/export/csv' + (queryParams.length ? '?' + queryParams.join('&') : '');
     window.open(url, '_blank');
 }

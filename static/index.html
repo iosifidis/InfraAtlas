@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="el">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,11 +8,14 @@
     <!-- Google Fonts: Outfit for titles, Inter for body -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700&display=swap"
+        rel="stylesheet">
     <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <link rel="stylesheet" href="style.css">
 </head>
+
 <body class="dark-theme">
 
     <!-- Auth Container: Setup or Login -->
@@ -65,7 +69,7 @@
                 </div>
                 <span class="brand-name">InfraAtlas</span>
             </div>
-            
+
             <nav class="sidebar-menu">
                 <a href="#dashboard" class="menu-item active" data-tab="dashboard">
                     <i data-lucide="layout-dashboard"></i>
@@ -81,7 +85,7 @@
                 </a>
                 <a href="#dns" class="menu-item" data-tab="dns">
                     <i data-lucide="globe"></i>
-                    <span>DNS Records (A & CNAME)</span>
+                    <span>DNS Records</span>
                 </a>
                 <a href="#reports" class="menu-item" data-tab="reports">
                     <i data-lucide="file-bar-chart"></i>
@@ -94,7 +98,8 @@
             </nav>
 
             <div class="sidebar-footer">
-                <div class="user-profile" onclick="openProfileModal()" style="cursor: pointer;" title="Στοιχεία Προφίλ & Αλλαγή Κωδικού">
+                <div class="user-profile" onclick="openProfileModal()" style="cursor: pointer;"
+                    title="Στοιχεία Προφίλ & Αλλαγή Κωδικού">
                     <div class="user-avatar" id="user-avatar-char">A</div>
                     <div class="user-details">
                         <span class="user-name" id="user-display-name">Διαχειριστής</span>
@@ -167,28 +172,37 @@
                                         <span>CPU Cores</span>
                                         <strong id="total-cpu-val">0</strong>
                                     </div>
-                                    <div class="meter-bar"><div class="meter-fill fill-cpu" id="total-cpu-fill" style="width: 0%"></div></div>
+                                    <div class="meter-bar">
+                                        <div class="meter-fill fill-cpu" id="total-cpu-fill" style="width: 0%"></div>
+                                    </div>
                                 </div>
                                 <div class="meter-group">
                                     <div class="meter-info">
                                         <span>RAM</span>
                                         <strong id="total-ram-val">0</strong>
                                     </div>
-                                    <div class="meter-bar"><div class="meter-fill fill-ram" id="total-ram-fill" style="width: 0%"></div></div>
+                                    <div class="meter-bar">
+                                        <div class="meter-fill fill-ram" id="total-ram-fill" style="width: 0%"></div>
+                                    </div>
                                 </div>
                                 <div class="meter-group">
                                     <div class="meter-info">
                                         <span>Κύριος Δίσκος</span>
                                         <strong id="total-disk-val">0</strong>
                                     </div>
-                                    <div class="meter-bar"><div class="meter-fill fill-disk" id="total-disk-fill" style="width: 0%"></div></div>
+                                    <div class="meter-bar">
+                                        <div class="meter-fill fill-disk" id="total-disk-fill" style="width: 0%"></div>
+                                    </div>
                                 </div>
                                 <div class="meter-group">
                                     <div class="meter-info">
                                         <span>Extra Δίσκος</span>
                                         <strong id="total-extradisk-val">0</strong>
                                     </div>
-                                    <div class="meter-bar"><div class="meter-fill fill-extradisk" id="total-extradisk-fill" style="width: 0%"></div></div>
+                                    <div class="meter-bar">
+                                        <div class="meter-fill fill-extradisk" id="total-extradisk-fill"
+                                            style="width: 0%"></div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -257,9 +271,11 @@
                         <div class="filters-row">
                             <div class="search-box">
                                 <i data-lucide="search"></i>
-                                <input type="text" id="vm-search" placeholder="Αναζήτηση με όνομα, IPv4, IPv6, URL, OS, υπεύθυνο..." oninput="fetchVMs()">
+                                <input type="text" id="vm-search"
+                                    placeholder="Αναζήτηση με όνομα, IPv4, IPv6, URL, OS, υπεύθυνο..."
+                                    oninput="fetchVMs()">
                             </div>
-                            
+
                             <div class="filter-dropdown">
                                 <label for="filter-cluster">Cluster</label>
                                 <select id="filter-cluster" onchange="fetchVMs()">
@@ -297,7 +313,8 @@
                         </div>
 
                         <div class="actions-row">
-                            <button class="btn btn-secondary" onclick="openVMImportModal()" style="margin-right: 0.5rem;">
+                            <button class="btn btn-secondary" onclick="openVMImportModal()"
+                                style="margin-right: 0.5rem;">
                                 <i data-lucide="file-up"></i>
                                 <span>Εισαγωγή CSV (VMs)</span>
                             </button>
@@ -336,9 +353,10 @@
                         <div class="filters-row">
                             <div class="search-box">
                                 <i data-lucide="search"></i>
-                                <input type="text" id="dns-search" placeholder="Αναζήτηση με IP ή Domain / URL..." oninput="fetchDNSRecords()">
+                                <input type="text" id="dns-search" placeholder="Αναζήτηση με IP ή Domain / URL..."
+                                    oninput="fetchDNSRecords()">
                             </div>
-                            
+
                             <div class="filter-dropdown">
                                 <label for="filter-dns-type">Τύπος Εγγραφής</label>
                                 <select id="filter-dns-type" onchange="fetchDNSRecords()">
@@ -350,7 +368,8 @@
                         </div>
 
                         <div class="actions-row">
-                            <button class="btn btn-secondary" onclick="openDNSImportModal()" style="margin-right: 0.5rem;">
+                            <button class="btn btn-secondary" onclick="openDNSImportModal()"
+                                style="margin-right: 0.5rem;">
                                 <i data-lucide="file-up"></i>
                                 <span>Εισαγωγή Zone File</span>
                             </button>
@@ -368,15 +387,18 @@
                                     <tr>
                                         <th onclick="sortDNSTable('name')" class="sortable-col">
                                             <span>Domain / Hostname</span>
-                                            <i id="dns-sort-icon-name" data-lucide="arrow-up-down" class="sort-icon"></i>
+                                            <i id="dns-sort-icon-name" data-lucide="arrow-up-down"
+                                                class="sort-icon"></i>
                                         </th>
                                         <th onclick="sortDNSTable('type')" class="sortable-col">
                                             <span>Τύπος</span>
-                                            <i id="dns-sort-icon-type" data-lucide="arrow-up-down" class="sort-icon"></i>
+                                            <i id="dns-sort-icon-type" data-lucide="arrow-up-down"
+                                                class="sort-icon"></i>
                                         </th>
                                         <th onclick="sortDNSTable('value')" class="sortable-col">
                                             <span>Τιμή (IP ή CNAME Target)</span>
-                                            <i id="dns-sort-icon-value" data-lucide="arrow-up-down" class="sort-icon"></i>
+                                            <i id="dns-sort-icon-value" data-lucide="arrow-up-down"
+                                                class="sort-icon"></i>
                                         </th>
                                         <th>Σύνδεση με VM</th>
                                         <th class="actions-col">Ενέργειες</th>
@@ -395,19 +417,27 @@
                     <div class="report-controls glass">
                         <h3>Φίλτρα Αναφοράς & Ελέγχου</h3>
                         <div class="presets-row">
-                            <button class="btn btn-outline" onclick="applyReportPreset('unused-important')">
+                            <button class="btn btn-outline" onclick="applyReportPreset('unused-important', this)">
                                 <i data-lucide="alert-triangle"></i>
                                 <span>Αχρησιμοποίητα Σημαντικά</span>
                             </button>
-                            <button class="btn btn-outline" onclick="applyReportPreset('external-clients')">
+                            <button class="btn btn-outline" onclick="applyReportPreset('external-clients', this)">
                                 <i data-lucide="users"></i>
                                 <span>Παραχωρημένα σε Τρίτους</span>
                             </button>
-                            <button class="btn btn-outline" onclick="applyReportPreset('unmonitored')">
+                            <button class="btn btn-outline" onclick="applyReportPreset('unmonitored', this)">
                                 <i data-lucide="eye-off"></i>
                                 <span>Χωρίς Monitoring</span>
                             </button>
-                            <button class="btn btn-outline" onclick="applyReportPreset('all')">
+                            <button class="btn btn-outline text-warning" onclick="applyReportPreset('unmatched-dns', this)">
+                                <i data-lucide="globe-x"></i>
+                                <span>DNS χωρίς VM (Προς Διαγραφή)</span>
+                            </button>
+                            <button class="btn btn-outline text-danger" onclick="applyReportPreset('unmatched-vms', this)">
+                                <i data-lucide="server-off"></i>
+                                <span>VMs χωρίς DNS (Προς Διαγραφή)</span>
+                            </button>
+                            <button class="btn btn-outline" onclick="applyReportPreset('all', this)">
                                 <i data-lucide="list"></i>
                                 <span>Όλα τα VMs</span>
                             </button>
@@ -494,7 +524,8 @@
                             <i data-lucide="sliders"></i>
                             <div>
                                 <h3>Προσαρμογή Φόρμας Εισαγωγής (Micro-edit)</h3>
-                                <p class="text-secondary">Επιλέξτε ποια προαιρετικά πεδία επιθυμείτε να εμφανίζονται στη φόρμα καταχώρησης των Virtual Machines.</p>
+                                <p class="text-secondary">Επιλέξτε ποια προαιρετικά πεδία επιθυμείτε να εμφανίζονται στη
+                                    φόρμα καταχώρησης των Virtual Machines.</p>
                             </div>
                         </div>
                         <hr class="divider">
@@ -696,7 +727,7 @@
                 <h3 id="vm-modal-title">Καταγραφή Νέου VM</h3>
                 <button class="btn-close" onclick="closeVMModal()"><i data-lucide="x"></i></button>
             </div>
-            
+
             <!-- Modal Tabs -->
             <div class="modal-tabs">
                 <button type="button" class="modal-tab-btn active" data-modaltab="vm-tab-basic">Βασικά Στοιχεία</button>
@@ -706,7 +737,7 @@
 
             <form id="vm-form" onsubmit="saveVM(event)">
                 <input type="hidden" id="vm-id">
-                
+
                 <!-- TAB 1: Basic Info -->
                 <div id="vm-tab-basic" class="modal-tab-content active">
                     <div class="form-grid">
@@ -785,7 +816,7 @@
                             <input type="text" id="vm-contact" placeholder="π.χ. Γιώργος Παπαδόπουλος">
                         </div>
                     </div>
-                    
+
                     <div class="checkboxes-group">
                         <div class="checkbox-control">
                             <label class="switch switch-small">
@@ -819,7 +850,8 @@
 
                     <div class="form-group mt-3" data-customfield="description">
                         <label for="vm-desc">Περιγραφή</label>
-                        <textarea id="vm-desc" rows="3" placeholder="Σημειώσεις και τεχνικές λεπτομέρειες..."></textarea>
+                        <textarea id="vm-desc" rows="3"
+                            placeholder="Σημειώσεις και τεχνικές λεπτομέρειες..."></textarea>
                     </div>
                 </div>
 
@@ -853,7 +885,8 @@
                 </div>
                 <div class="form-group">
                     <label for="dns-value">Τιμή / Target *</label>
-                    <input type="text" id="dns-value" required placeholder="IP (π.χ. 83.212.171.7) ή CNAME target (π.χ. ellak.gr)">
+                    <input type="text" id="dns-value" required
+                        placeholder="IP (π.χ. 83.212.171.7) ή CNAME target (π.χ. ellak.gr)">
                 </div>
                 <div class="form-group">
                     <label for="dns-desc">Περιγραφή / Σημειώσεις</label>
@@ -879,10 +912,12 @@
                     <label for="dns-file-input">Επιλέξτε Αρχείο Zone File (.txt / zonefile)</label>
                     <input type="file" id="dns-file-input" accept=".txt,.zone,.cap">
                 </div>
-                <div style="text-align: center; margin: 0.5rem 0; color: var(--text-muted); font-size: 0.85rem;">— Η επικολλούμενο κείμενο zonefile —</div>
+                <div style="text-align: center; margin: 0.5rem 0; color: var(--text-muted); font-size: 0.85rem;">— Η
+                    επικολλούμενο κείμενο zonefile —</div>
                 <div class="form-group">
                     <label for="dns-paste-input">Περιεχόμενο Zone File</label>
-                    <textarea id="dns-paste-input" rows="8" placeholder="Επικολλήστε εδώ τις εγγραφές του zonefile... (π.χ. web.ellak.gr. 86400 IN A 83.212.171.7)"></textarea>
+                    <textarea id="dns-paste-input" rows="8"
+                        placeholder="Επικολλήστε εδώ τις εγγραφές του zonefile... (π.χ. web.ellak.gr. 86400 IN A 83.212.171.7)"></textarea>
                 </div>
                 <div id="dns-import-alert" class="alert hidden" style="margin-top: 1rem;"></div>
                 <div class="modal-actions">
@@ -948,7 +983,8 @@
                 <div class="divider"><span>ή Επικόλληση Περιεχομένου</span></div>
                 <div class="form-group">
                     <label for="vm-paste-input">Περιεχόμενο CSV</label>
-                    <textarea id="vm-paste-input" rows="8" placeholder="Επικολλήστε εδώ τις γραμμές του CSV..."></textarea>
+                    <textarea id="vm-paste-input" rows="8"
+                        placeholder="Επικολλήστε εδώ τις γραμμές του CSV..."></textarea>
                 </div>
                 <div id="vm-import-alert" class="alert hidden" style="margin-top: 1rem;"></div>
                 <div class="modal-actions">
@@ -971,7 +1007,8 @@
             </div>
             <div class="modal-body">
                 <i data-lucide="alert-triangle" class="alert-icon-large text-danger"></i>
-                <p id="delete-modal-message">Είστε σίγουροι ότι θέλετε να προχωρήσετε στη διαγραφή; Αυτή η ενέργεια είναι οριστική και δεν μπορεί να αναιρεθεί.</p>
+                <p id="delete-modal-message">Είστε σίγουροι ότι θέλετε να προχωρήσετε στη διαγραφή; Αυτή η ενέργεια
+                    είναι οριστική και δεν μπορεί να αναιρεθεί.</p>
             </div>
             <div class="modal-actions">
                 <button type="button" class="btn btn-outline" onclick="closeDeleteModal()">Ακύρωση</button>
@@ -982,4 +1019,5 @@
 
     <script src="app.js"></script>
 </body>
+
 </html>
