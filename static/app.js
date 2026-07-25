@@ -1395,14 +1395,30 @@ function renderUnmatchedDNSTable(records) {
 
     records.forEach(r => {
         const row = document.createElement('tr');
+        row.classList.add('dns-table-row', 'clickable-row');
+        row.setAttribute('title', 'Κάντε κλικ για επεξεργασία DNS');
+        row.onclick = (e) => {
+            if (e.target.closest('a') || e.target.closest('button')) return;
+            openDNSModal(r.id);
+        };
         row.innerHTML = `
-            <td><strong>${escapeHTML(r.name)}</strong></td>
+            <td class="col-dns-info">
+                <div class="vm-row-flex">
+                    <div class="vm-main-details">
+                        <div class="vm-name-title">${escapeHTML(r.name)}</div>
+                        <div class="vm-url-sub"><code>${escapeHTML(r.value)}</code> (${r.type})</div>
+                    </div>
+                    <div class="mobile-chevron-icon">
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                </div>
+            </td>
             <td><span class="badge ${r.type === 'A' ? 'badge-info' : 'badge-warning'}">${escapeHTML(r.type)}</span></td>
             <td><code>${escapeHTML(r.value)}</code></td>
             <td><span style="font-size:0.8125rem; color:var(--text-secondary);">Δεν βρέθηκε VM με αυτή την IP ή URL</span></td>
             <td><span class="badge badge-danger">Υποψήφιο για Διαγραφή DNS</span></td>
             <td class="actions-col">
-                <button class="btn-icon-only text-danger" onclick="openDeleteModal('dns', ${r.id})" title="Διαγραφή Εγγραφής DNS"><i data-lucide="trash-2"></i></button>
+                <button class="btn-icon-only text-danger" onclick="event.stopPropagation(); openDeleteModal('dns', ${r.id})" title="Διαγραφή Εγγραφής DNS"><i data-lucide="trash-2"></i></button>
             </td>
         `;
         tbody.appendChild(row);
@@ -1441,14 +1457,30 @@ function renderUnmatchedVMsTable(vms) {
 
     vms.forEach(v => {
         const row = document.createElement('tr');
+        row.classList.add('vm-table-row', 'clickable-row');
+        row.setAttribute('title', 'Κάντε κλικ για προβολή / επεξεργασία VM');
+        row.onclick = (e) => {
+            if (e.target.closest('a') || e.target.closest('button')) return;
+            openVMModal(v.id);
+        };
         row.innerHTML = `
-            <td><strong>${escapeHTML(v.name)}</strong></td>
+            <td class="col-vm-info">
+                <div class="vm-row-flex">
+                    <div class="vm-main-details">
+                        <div class="vm-name-title">${escapeHTML(v.name)}</div>
+                        <div class="vm-url-sub">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
+                    </div>
+                    <div class="mobile-chevron-icon">
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                </div>
+            </td>
             <td><span class="badge badge-info">${escapeHTML(v.cluster_name)}</span></td>
             <td><code>${escapeHTML(v.ipv4 || v.ipv6 || '-')}</code></td>
-            <td><span style="font-size:0.8125rem;">${v.url ? escapeHTML(v.url) : '-'}</span></td>
+            <td><span style="font-size:0.8125rem;">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '-'}</span></td>
             <td><span class="badge badge-danger">Υποψήφιο για Διαγραφή VM</span></td>
             <td class="actions-col">
-                <button class="btn-icon-only text-danger" onclick="openDeleteModal('vm', ${v.id})" title="Διαγραφή VM"><i data-lucide="trash-2"></i></button>
+                <button class="btn-icon-only text-danger" onclick="event.stopPropagation(); openDeleteModal('vm', ${v.id})" title="Διαγραφή VM"><i data-lucide="trash-2"></i></button>
             </td>
         `;
         tbody.appendChild(row);
@@ -1498,8 +1530,24 @@ function renderReportTable(vms) {
 
     vms.forEach(v => {
         const row = document.createElement('tr');
+        row.classList.add('vm-table-row', 'clickable-row');
+        row.setAttribute('title', 'Κάντε κλικ για προβολή / επεξεργασία VM');
+        row.onclick = (e) => {
+            if (e.target.closest('a') || e.target.closest('button')) return;
+            openVMModal(v.id);
+        };
         row.innerHTML = `
-            <td><strong>${escapeHTML(v.name)}</strong></td>
+            <td class="col-vm-info">
+                <div class="vm-row-flex">
+                    <div class="vm-main-details">
+                        <div class="vm-name-title">${escapeHTML(v.name)}</div>
+                        <div class="vm-url-sub">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
+                    </div>
+                    <div class="mobile-chevron-icon">
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                </div>
+            </td>
             <td><span class="badge badge-info">${escapeHTML(v.cluster_name)}</span></td>
             <td><span style="font-size:0.75rem;">CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}</span></td>
             <td><code>${escapeHTML(v.ipv4 || '-')}</code></td>
@@ -1516,6 +1564,8 @@ function renderReportTable(vms) {
         `;
         tbody.appendChild(row);
     });
+
+    lucide.createIcons();
 
     state.currentReportData = vms;
 }

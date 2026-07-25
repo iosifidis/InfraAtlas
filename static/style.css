@@ -1402,29 +1402,39 @@ input:checked + .switch-small .slider:before {
         justify-content: center;
     }
 
-    /* Responsive Virtual Machines Table */
-    .vms-table-wrapper .data-table thead tr th:nth-child(n+2) {
+    /* Responsive Virtual Machines & Reports Tables */
+    .vms-table-wrapper .data-table thead tr th:nth-child(n+2),
+    .report-results-wrapper .data-table thead tr th:nth-child(n+2),
+    #report-table thead tr th:nth-child(n+2) {
         display: none !important;
     }
     
-    .vms-table-wrapper .data-table thead tr th:first-child {
+    .vms-table-wrapper .data-table thead tr th:first-child,
+    .report-results-wrapper .data-table thead tr th:first-child,
+    #report-table thead tr th:first-child {
         width: 100% !important;
         display: block !important;
         box-sizing: border-box;
     }
 
-    .vms-table-wrapper .data-table tbody tr td:nth-child(n+2) {
+    .vms-table-wrapper .data-table tbody tr td:nth-child(n+2),
+    .report-results-wrapper .data-table tbody tr td:nth-child(n+2),
+    #report-table tbody tr td:nth-child(n+2) {
         display: none !important;
     }
 
-    .vms-table-wrapper .data-table tbody tr {
+    .vms-table-wrapper .data-table tbody tr,
+    .report-results-wrapper .data-table tbody tr,
+    #report-table tbody tr {
         display: block !important;
         border-bottom: 1px solid var(--border-color);
         padding: 0.25rem 0;
         cursor: pointer;
     }
 
-    .vms-table-wrapper .data-table tbody tr td:first-child {
+    .vms-table-wrapper .data-table tbody tr td:first-child,
+    .report-results-wrapper .data-table tbody tr td:first-child,
+    #report-table tbody tr td:first-child {
         width: 100% !important;
         display: block !important;
         padding: 0.75rem 1rem !important;
