@@ -100,6 +100,14 @@ InfraAtlas/
 
 ---
 
+## Screehnots
+
+![Νέο VM](new_vm_form.png)
+
+![Προβολή των VM](reports_view.png)
+
+---
+
 ## 📜 Άδεια Χρήσης (License)
 
 Το **InfraAtlas** είναι ελεύθερο λογισμικό και διατίθεται υπό την άδεια **GNU Affero General Public License v3.0 (AGPL-3.0)**. 
