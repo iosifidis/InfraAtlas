@@ -160,6 +160,13 @@
                                 <h3 class="stat-value" id="stat-important">0</h3>
                             </div>
                         </div>
+                        <div class="stat-card glass">
+                            <div class="stat-icon icon-warning"><i data-lucide="activity"></i></div>
+                            <div class="stat-info">
+                                <span class="stat-label">Monitored VMs</span>
+                                <h3 class="stat-value" id="stat-monitored">0</h3>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Resource Allocation Grid -->
@@ -207,19 +214,15 @@
                         </div>
 
                         <div class="resource-card glass">
-                            <h3>Υπεύθυνα VMs & Επίβλεψη</h3>
-                            <div class="stats-mini-grid">
-                                <div class="mini-stat">
-                                    <span class="mini-val" id="stat-monitored">0</span>
-                                    <span class="mini-label"><i data-lucide="activity"></i> Monitored</span>
-                                </div>
-                                <div class="mini-stat">
-                                    <span class="mini-val" id="stat-internal">0</span>
-                                    <span class="mini-label"><i data-lucide="user-check"></i> Δικά μας (Internal)</span>
-                                </div>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                                <h3 style="margin:0; display:flex; align-items:center; gap:0.4rem;">
+                                    <i data-lucide="arrow-up-circle" style="color:var(--warning);"></i>
+                                    <span>VMs που Χρειάζονται Αναβάθμιση</span>
+                                </h3>
+                                <span class="badge badge-warning" id="upgrades-count-badge">0</span>
                             </div>
-                            <div id="alert-zone" class="alert-zone">
-                                <!-- Alerts generated dynamically -->
+                            <div id="upgrades-list" class="upgrades-list">
+                                <!-- Dynamic list of VMs needing OS or App upgrades -->
                             </div>
                         </div>
                     </div>

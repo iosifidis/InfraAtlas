@@ -409,13 +409,16 @@ function renderStatsDashboard() {
     const stats = state.stats;
     if (!stats) return;
 
-    // Counters
-    document.getElementById('stat-clusters').textContent = stats.total_clusters || 0;
-    document.getElementById('stat-vms').textContent = stats.total_vms || 0;
-    document.getElementById('stat-in-use').textContent = stats.in_use_vms || 0;
-    document.getElementById('stat-important').textContent = stats.important_vms || 0;
-    document.getElementById('stat-monitored').textContent = stats.monitored_vms || 0;
-    document.getElementById('stat-internal').textContent = stats.used_by_us_vms || 0;
+    const setVal = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+    };
+    setVal('stat-clusters', stats.total_clusters || 0);
+    setVal('stat-vms', stats.total_vms || 0);
+    setVal('stat-in-use', stats.in_use_vms || 0);
+    setVal('stat-important', stats.important_vms || 0);
+    setVal('stat-monitored', stats.monitored_vms || 0);
+    setVal('stat-internal', stats.used_by_us_vms || 0);
 
     // Resource totals across all VMs
     const allocatedCPU = stats.total_cpu || 0;
@@ -478,41 +481,46 @@ function renderStatsDashboard() {
         }
     }
 
-    // Smart Warnings Generator
-    const alertZone = document.getElementById('alert-zone');
-    alertZone.innerHTML = '';
-
-    let warningsCount = 0;
-    state.vms.forEach(v => {
-        if (v.is_important === 1 && v.in_use === 0) {
-            warningsCount++;
-            const alertCard = document.createElement('div');
-            alertCard.className = 'alert-item alert-item-warning';
-            alertCard.innerHTML = `
-                <i data-lucide="alert-triangle"></i>
-                <span>Το VM <strong>${escapeHTML(v.name)}</strong> (${escapeHTML(v.cluster_name)}) είναι Σημαντικό αλλά <strong>Δεν χρησιμοποιείται</strong>.</span>
-            `;
-            alertZone.appendChild(alertCard);
+    // Render Upgrades Needing List
+    const upgradesListContainer = document.getElementById('upgrades-list');
+    const upgradesBadge = document.getElementById('upgrades-count-badge');
+    if (upgradesListContainer) {
+        upgradesListContainer.innerHTML = '';
+        const needingUpgrade = (state.vms || []).filter(v => v.os_upgrade === 1 || v.app_upgrade === 1);
+        if (upgradesBadge) {
+            upgradesBadge.textContent = needingUpgrade.length;
         }
-        if (v.is_important === 1 && v.monitored === 0) {
-            warningsCount++;
-            const alertCard = document.createElement('div');
-            alertCard.className = 'alert-item alert-item-warning';
-            alertCard.innerHTML = `
-                <i data-lucide="eye-off"></i>
-                <span>Το VM <strong>${escapeHTML(v.name)}</strong> (${escapeHTML(v.cluster_name)}) είναι Σημαντικό αλλά <strong>Δεν παρακολουθείται (Unmonitored)</strong>.</span>
-            `;
-            alertZone.appendChild(alertCard);
-        }
-    });
 
-    if (warningsCount === 0) {
-        alertZone.innerHTML = `
-            <div class="alert-item alert-item-warning" style="background: rgba(16, 185, 129, 0.06); border-left-color: var(--success); color: #ecfdf5;">
-                <i data-lucide="check-circle" style="color: var(--success)"></i>
-                <span>Δεν εντοπίστηκαν εκκρεμότητες ή ανενεργά σημαντικά VM.</span>
-            </div>
-        `;
+        if (needingUpgrade.length === 0) {
+            upgradesListContainer.innerHTML = `
+                <div style="text-align: center; padding: 1.5rem 0.5rem; color: var(--text-secondary); font-size: 0.875rem;">
+                    <i data-lucide="check-circle" style="color: var(--success); width: 32px; height: 32px; display: block; margin: 0 auto 0.5rem auto;"></i>
+                    Όλα τα VMs είναι ενημερωμένα!
+                </div>
+            `;
+        } else {
+            needingUpgrade.forEach(v => {
+                const card = document.createElement('div');
+                card.className = 'upgrade-item-card';
+                card.style.cursor = 'pointer';
+                card.onclick = () => openVMModal(v.id);
+
+                let badgesHtml = '';
+                if (v.os_upgrade === 1) badgesHtml += '<span class="badge badge-warning" style="margin-left:4px;" title="Αναβάθμιση Λειτουργικού">OS Upgr</span>';
+                if (v.app_upgrade === 1) badgesHtml += '<span class="badge badge-primary" style="margin-left:4px;" title="Αναβάθμιση Λογισμικού">App Upgr</span>';
+
+                card.innerHTML = `
+                    <div class="upgrade-item-main">
+                        <div class="upgrade-item-name">${escapeHTML(v.name)}</div>
+                        <div class="upgrade-item-ip"><code>${escapeHTML(v.ipv4 || 'Χωρίς IP')}</code> <span style="font-size:0.7rem; opacity:0.7;">(${escapeHTML(v.cluster_name)})</span></div>
+                    </div>
+                    <div class="upgrade-item-badges">
+                        ${badgesHtml}
+                    </div>
+                `;
+                upgradesListContainer.appendChild(card);
+            });
+        }
     }
     
     lucide.createIcons();

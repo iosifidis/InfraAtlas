@@ -691,36 +691,87 @@ input:checked + .switch-small .slider:before {
    ------------------------------------------------------------- */
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 1.5rem;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 1rem;
     margin-bottom: 2rem;
 }
 
 .stat-card {
-    padding: 1.5rem;
+    padding: 1.15rem 1rem;
     display: flex;
     align-items: center;
-    gap: 1.25rem;
+    gap: 1rem;
 }
 
 .stat-icon {
-    width: 48px;
-    height: 48px;
+    width: 44px;
+    height: 44px;
     border-radius: var(--radius-md);
     display: flex;
     align-items: center;
     justify-content: center;
+    flex-shrink: 0;
 }
-.stat-icon i { width: 22px; height: 22px; }
+.stat-icon i { width: 20px; height: 20px; }
 
 .icon-primary { background: var(--primary-glow); color: var(--primary); }
 .icon-success { background: var(--success-bg); color: var(--success); }
 .icon-info { background: var(--info-bg); color: var(--info); }
 .icon-danger { background: var(--danger-bg); color: var(--danger); }
+.icon-warning { background: rgba(245, 158, 11, 0.15); color: #f59e0b; }
 
 .stat-info { display: flex; flex-direction: column; }
 .stat-label { font-size: 0.8125rem; color: var(--text-secondary); font-weight: 500; }
-.stat-value { font-size: 1.625rem; font-weight: 700; color: #ffffff; line-height: 1.2; }
+.stat-value { font-size: 1.5rem; font-weight: 700; color: #ffffff; line-height: 1.2; }
+
+/* Upgrades List in Dashboard */
+.upgrades-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    max-height: 250px;
+    overflow-y: auto;
+    padding-right: 4px;
+}
+
+.upgrade-item-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    transition: all 0.2s ease;
+}
+
+.upgrade-item-card:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: var(--primary);
+    transform: translateX(4px);
+}
+
+.upgrade-item-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+}
+
+.upgrade-item-name {
+    font-weight: 600;
+    color: #ffffff;
+    font-size: 0.875rem;
+}
+
+.upgrade-item-ip code {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.upgrade-item-badges {
+    display: flex;
+    gap: 0.4rem;
+}
 
 /* Resources meters */
 .resources-grid {
