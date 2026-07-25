@@ -745,7 +745,7 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprintf("%.1f", v.ExtraDisk),
 			escapeCSV(v.IPv4),
 			escapeCSV(v.IPv6),
-			escapeCSV(v.VPN),
+			boolToGreek(v.VPN),
 			escapeCSV(v.Backup),
 			boolToGreek(v.Monitored),
 			escapeCSV(v.OS),
@@ -1161,7 +1161,12 @@ func parseVMCSV(content string) ([]parsedVMItem, error) {
 			vm.IPv6 = strings.TrimSpace(record[10])
 		}
 		if len(record) > 11 {
-			vm.VPN = strings.TrimSpace(record[11])
+			val := strings.ToUpper(strings.TrimSpace(record[11]))
+			if val != "" && !strings.Contains(val, "OXI") && !strings.Contains(val, "ΟΧΙ") && val != "0" {
+				vm.VPN = 1
+			} else {
+				vm.VPN = 0
+			}
 		}
 		if len(record) > 12 {
 			vm.Backup = strings.TrimSpace(record[12])

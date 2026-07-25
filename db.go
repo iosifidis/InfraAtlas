@@ -37,7 +37,7 @@ type VM struct {
 	ExtraDisk       float64   `json:"extra_disk"`
 	IPv4            string    `json:"ipv4"`
 	IPv6            string    `json:"ipv6"`
-	VPN             string    `json:"vpn"`
+	VPN             int       `json:"vpn"`         // 0 or 1
 	Backup          string    `json:"backup"`
 	Monitored       int       `json:"monitored"`   // 0 or 1
 	OSUpgrade       int       `json:"os_upgrade"`  // 0 or 1
@@ -323,7 +323,7 @@ func GetVMs(clusterID int64, inUse *int, isImportant *int, monitored *int, searc
 		v.URL = url.String
 		v.IPv4 = ipv4.String
 		v.IPv6 = ipv6.String
-		v.VPN = vpn.String
+		v.VPN = parseBoolInt(vpn.String)
 		v.Backup = backup.String
 		v.OS = os.String
 		v.OSVersion = osVer.String
@@ -332,6 +332,17 @@ func GetVMs(clusterID int64, inUse *int, isImportant *int, monitored *int, searc
 		vms = append(vms, v)
 	}
 	return vms, nil
+}
+
+func parseBoolInt(s string) int {
+	s = strings.TrimSpace(s)
+	if s == "1" || strings.EqualFold(s, "true") || strings.EqualFold(s, "yes") || strings.EqualFold(s, "nai") || strings.EqualFold(s, "ναι") {
+		return 1
+	}
+	if strings.Contains(s, "Client Configured") || strings.Contains(s, "VPN") {
+		return 1
+	}
+	return 0
 }
 
 func GetVM(id int64) (VM, error) {
@@ -359,7 +370,7 @@ func GetVM(id int64) (VM, error) {
 	v.URL = url.String
 	v.IPv4 = ipv4.String
 	v.IPv6 = ipv6.String
-	v.VPN = vpn.String
+	v.VPN = parseBoolInt(vpn.String)
 	v.Backup = backup.String
 	v.OS = os.String
 	v.OSVersion = osVer.String

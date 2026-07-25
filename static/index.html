@@ -864,10 +864,6 @@
                             <label for="vm-ipv6">Διεύθυνση IPv6</label>
                             <input type="text" id="vm-ipv6" placeholder="π.χ. fe80::...">
                         </div>
-                        <div class="form-group" data-customfield="vpn">
-                            <label for="vm-vpn">VPN Σύνδεση (Status/Σημειώσεις)</label>
-                            <input type="text" id="vm-vpn" placeholder="π.ex. OpenVPN Client Configured">
-                        </div>
                         <div class="form-group" data-customfield="backup">
                             <label for="vm-backup">Backup Scheme</label>
                             <input type="text" id="vm-backup" placeholder="π.χ. Daily Proxmox Backup Server">
@@ -906,6 +902,13 @@
                                 <span class="slider"></span>
                             </label>
                             <span>Monitored</span>
+                        </div>
+                        <div class="checkbox-control" data-customfield="vpn">
+                            <label class="switch switch-small">
+                                <input type="checkbox" id="vm-vpn">
+                                <span class="slider"></span>
+                            </label>
+                            <span>VPN Σύνδεση</span>
                         </div>
                         <div class="checkbox-control" data-customfield="os_upgrade">
                             <label class="switch switch-small">

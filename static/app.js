@@ -772,6 +772,7 @@ function openVMModal(id = null) {
                 document.getElementById('vm-is-important').checked = v.is_important === 1;
                 document.getElementById('vm-used-by-us').checked = v.used_by_us === 1;
                 document.getElementById('vm-monitored').checked = v.monitored === 1;
+                document.getElementById('vm-vpn').checked = v.vpn === 1;
                 document.getElementById('vm-os-upgrade').checked = v.os_upgrade === 1;
                 document.getElementById('vm-app-upgrade').checked = v.app_upgrade === 1;
                 
@@ -781,6 +782,7 @@ function openVMModal(id = null) {
     } else {
         title.textContent = 'Καταγραφή Νέου Virtual Machine';
         
+        document.getElementById('vm-vpn').checked = false;
         document.getElementById('vm-os-upgrade').checked = false;
         document.getElementById('vm-app-upgrade').checked = false;
 
@@ -823,7 +825,6 @@ function saveVM(e) {
         
         ipv4: document.getElementById('vm-ipv4').value.trim(),
         ipv6: document.getElementById('vm-ipv6').value.trim(),
-        vpn: document.getElementById('vm-vpn').value.trim(),
         backup: document.getElementById('vm-backup').value.trim(),
         contact_person: document.getElementById('vm-contact').value.trim(),
         description: document.getElementById('vm-desc').value.trim(),
@@ -832,6 +833,7 @@ function saveVM(e) {
         is_important: document.getElementById('vm-is-important').checked ? 1 : 0,
         used_by_us: document.getElementById('vm-used-by-us').checked ? 1 : 0,
         monitored: document.getElementById('vm-monitored').checked ? 1 : 0,
+        vpn: document.getElementById('vm-vpn').checked ? 1 : 0,
         os_upgrade: document.getElementById('vm-os-upgrade').checked ? 1 : 0,
         app_upgrade: document.getElementById('vm-app-upgrade').checked ? 1 : 0
     };
@@ -1481,7 +1483,7 @@ function renderReportTable(vms) {
             <td><code>${escapeHTML(v.ipv4 || '-')}</code></td>
             <td>
                 <div style="font-size: 0.75rem;">
-                    <div>VPN: ${escapeHTML(v.vpn || 'Όχι')}</div>
+                    <div>VPN: ${v.vpn === 1 ? 'Ναι' : 'Όχι'}</div>
                     <div>Backup: ${escapeHTML(v.backup || 'Όχι')}</div>
                 </div>
             </td>
