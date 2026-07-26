@@ -666,7 +666,8 @@ function renderVMs() {
         if (v.monitored === 1) badgesHtml += '<span class="badge badge-info" style="margin-left:4px;">Monitored</span>';
         if (v.os_upgrade === 1) badgesHtml += '<span class="badge badge-warning" style="margin-left:4px;" title="Αναβάθμιση Λειτουργικού">OS Upgr</span>';
         if (v.app_upgrade === 1) badgesHtml += '<span class="badge badge-primary" style="margin-left:4px;" title="Αναβάθμιση Λογισμικού">App Upgr</span>';
-        if (v.used_by_us === 0) badgesHtml += '<span class="badge badge-warning" style="margin-left:4px;">Client</span>';
+        if (v.ansible === 1) badgesHtml += '<span class="badge badge-info" style="margin-left:4px;" title="Ansible">Ansible</span>';
+        if (v.docker === 1) badgesHtml += '<span class="badge badge-primary" style="margin-left:4px;" title="Docker">Docker</span>';
 
         const specsText = `CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}${v.extra_disk > 0 ? ' +' + v.extra_disk : ''}`;
 
@@ -818,7 +819,8 @@ function openVMModal(id = null) {
 
                 document.getElementById('vm-in-use').checked = v.in_use === 1;
                 document.getElementById('vm-is-important').checked = v.is_important === 1;
-                document.getElementById('vm-used-by-us').checked = v.used_by_us === 1;
+                document.getElementById('vm-ansible').checked = v.ansible === 1;
+                document.getElementById('vm-docker').checked = v.docker === 1;
                 document.getElementById('vm-monitored').checked = v.monitored === 1;
                 document.getElementById('vm-os-upgrade').checked = v.os_upgrade === 1;
                 document.getElementById('vm-app-upgrade').checked = v.app_upgrade === 1;
@@ -831,6 +833,8 @@ function openVMModal(id = null) {
         title.textContent = 'Καταγραφή Νέου Virtual Machine';
         
         document.getElementById('vm-vpn').checked = false;
+        document.getElementById('vm-ansible').checked = false;
+        document.getElementById('vm-docker').checked = false;
         document.getElementById('vm-os-upgrade').checked = false;
         document.getElementById('vm-app-upgrade').checked = false;
 
@@ -881,7 +885,8 @@ function saveVM(e) {
 
         in_use: document.getElementById('vm-in-use').checked ? 1 : 0,
         is_important: document.getElementById('vm-is-important').checked ? 1 : 0,
-        used_by_us: document.getElementById('vm-used-by-us').checked ? 1 : 0,
+        ansible: document.getElementById('vm-ansible').checked ? 1 : 0,
+        docker: document.getElementById('vm-docker').checked ? 1 : 0,
         monitored: document.getElementById('vm-monitored').checked ? 1 : 0,
         vpn: document.getElementById('vm-vpn').checked ? 1 : 0,
         os_upgrade: document.getElementById('vm-os-upgrade').checked ? 1 : 0,
@@ -1317,7 +1322,8 @@ function applyReportPreset(preset, btnElem) {
     document.getElementById('report-cluster').value = '';
     document.getElementById('report-in-use').value = '';
     document.getElementById('report-important').value = '';
-    document.getElementById('report-used-by-us').value = '';
+    document.getElementById('report-ansible').value = '';
+    document.getElementById('report-docker').value = '';
     
     // Toggle active classes on preset buttons
     document.querySelectorAll('.presets-row .btn').forEach(btn => {
@@ -1332,8 +1338,8 @@ function applyReportPreset(preset, btnElem) {
     if (preset === 'unused-important') {
         document.getElementById('report-in-use').value = '0';
         document.getElementById('report-important').value = '1';
-    } else if (preset === 'external-clients') {
-        document.getElementById('report-used-by-us').value = '0';
+    } else if (preset === 'docker-vms') {
+        document.getElementById('report-docker').value = '1';
     } else if (preset === 'unmonitored') {
         document.getElementById('report-important').value = '';
     }
@@ -1346,7 +1352,8 @@ function runReport() {
     const clusterId = document.getElementById('report-cluster').value;
     const inUse = document.getElementById('report-in-use').value;
     const important = document.getElementById('report-important').value;
-    const usedByUs = document.getElementById('report-used-by-us').value;
+    const ansible = document.getElementById('report-ansible').value;
+    const docker = document.getElementById('report-docker').value;
 
     if (state.activeReportPreset === 'unmatched-dns') {
         Promise.all([
@@ -1372,7 +1379,8 @@ function runReport() {
             if (clusterId) unmatchedVMs = unmatchedVMs.filter(v => v.cluster_id === parseInt(clusterId));
             if (inUse !== '') unmatchedVMs = unmatchedVMs.filter(v => v.in_use === parseInt(inUse));
             if (important !== '') unmatchedVMs = unmatchedVMs.filter(v => v.is_important === parseInt(important));
-            if (usedByUs !== '') unmatchedVMs = unmatchedVMs.filter(v => v.used_by_us === parseInt(usedByUs));
+            if (ansible !== '') unmatchedVMs = unmatchedVMs.filter(v => v.ansible === parseInt(ansible));
+            if (docker !== '') unmatchedVMs = unmatchedVMs.filter(v => v.docker === parseInt(docker));
 
             renderUnmatchedVMsTable(unmatchedVMs);
         })
@@ -1395,8 +1403,11 @@ function runReport() {
             if (state.activeReportPreset === 'unmonitored') {
                 vms = vms.filter(v => v.monitored === 0);
             }
-            if (usedByUs !== '') {
-                vms = vms.filter(v => v.used_by_us === parseInt(usedByUs));
+            if (ansible !== '') {
+                vms = vms.filter(v => v.ansible === parseInt(ansible));
+            }
+            if (docker !== '') {
+                vms = vms.filter(v => v.docker === parseInt(docker));
             }
 
             renderReportTable(vms);
@@ -1541,7 +1552,7 @@ function renderReportTable(vms) {
             <th>VPN / Backup</th>
             <th>Σε Χρήση</th>
             <th>Σημαντικό</th>
-            <th>Δικό μας</th>
+            <th>Docker / Ansible</th>
             <th>Υπεύθυνος</th>
         </tr>
     `;
@@ -1553,8 +1564,8 @@ function renderReportTable(vms) {
     const resultsTitle = document.getElementById('report-results-title');
     if (state.activeReportPreset === 'unused-important') {
         resultsTitle.textContent = 'Ανενεργά Σημαντικά VMs (Προς Έλεγχο/Διαγραφή)';
-    } else if (state.activeReportPreset === 'external-clients') {
-        resultsTitle.textContent = 'VMs Παραχωρημένα σε Εξωτερικούς Συνεργάτες / Τρίτους';
+    } else if (state.activeReportPreset === 'docker-vms') {
+        resultsTitle.textContent = 'Virtual Machines με Εγκατάσταση Docker';
     } else if (state.activeReportPreset === 'unmonitored') {
         resultsTitle.textContent = 'VMs Χωρίς Επίβλεψη (Unmonitored)';
     } else {
@@ -1597,7 +1608,12 @@ function renderReportTable(vms) {
             </td>
             <td><span class="badge ${v.in_use === 1 ? 'badge-success' : 'badge-danger'}">${v.in_use === 1 ? 'Ναι' : 'Όχι'}</span></td>
             <td><span class="badge ${v.is_important === 1 ? 'badge-danger' : 'badge-info'}">${v.is_important === 1 ? 'Ναι' : 'Όχι'}</span></td>
-            <td><span class="badge ${v.used_by_us === 1 ? 'badge-success' : 'badge-warning'}">${v.used_by_us === 1 ? 'Εμείς' : 'Τρίτοι'}</span></td>
+            <td>
+                <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                    <span class="badge ${v.docker === 1 ? 'badge-primary' : 'badge-secondary'}" style="${v.docker === 0 ? 'opacity:0.6;' : ''}">Docker: ${v.docker === 1 ? 'Ναι' : 'Όχι'}</span>
+                    <span class="badge ${v.ansible === 1 ? 'badge-info' : 'badge-secondary'}" style="${v.ansible === 0 ? 'opacity:0.6;' : ''}">Ansible: ${v.ansible === 1 ? 'Ναι' : 'Όχι'}</span>
+                </div>
+            </td>
             <td><span style="font-size: 0.75rem;">${escapeHTML(v.contact_person || 'Εμείς')}</span></td>
         `;
         tbody.appendChild(row);

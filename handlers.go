@@ -560,7 +560,8 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 	var inUseVMs int
 	var importantVMs int
 	var monitoredVMs int
-	var usedByUsVMs int
+	var ansibleVMs int
+	var dockerVMs int
 
 	clusterStats := make(map[int64]map[string]interface{})
 	for _, c := range clusters {
@@ -588,8 +589,11 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		if v.Monitored == 1 {
 			monitoredVMs++
 		}
-		if v.UsedByUs == 1 {
-			usedByUsVMs++
+		if v.Ansible == 1 {
+			ansibleVMs++
+		}
+		if v.Docker == 1 {
+			dockerVMs++
 		}
 
 		totalCPU += v.CPU
@@ -605,9 +609,6 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 			stat["vm_count"] = stat["vm_count"].(int) + 1
 			if v.InUse == 1 {
 				stat["in_use_count"] = stat["in_use_count"].(int) + 1
-			}
-			if v.UsedByUs == 1 {
-				stat["internal_count"] = stat["internal_count"].(int) + 1
 			}
 		}
 	}
@@ -626,7 +627,8 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		"in_use_vms":           inUseVMs,
 		"important_vms":        importantVMs,
 		"monitored_vms":        monitoredVMs,
-		"used_by_us_vms":       usedByUsVMs,
+		"ansible_vms":          ansibleVMs,
+		"docker_vms":           dockerVMs,
 		"total_cpu":            totalCPU,
 		"total_ram":            totalRAM,
 		"total_disk":           totalDisk,

@@ -422,9 +422,9 @@
                                 <i data-lucide="alert-triangle"></i>
                                 <span>Αχρησιμοποίητα Σημαντικά</span>
                             </button>
-                            <button class="btn btn-outline" onclick="applyReportPreset('external-clients', this)">
-                                <i data-lucide="users"></i>
-                                <span>Παραχωρημένα σε Τρίτους</span>
+                            <button class="btn btn-outline" onclick="applyReportPreset('docker-vms', this)">
+                                <i data-lucide="container"></i>
+                                <span>VMs με Docker</span>
                             </button>
                             <button class="btn btn-outline" onclick="applyReportPreset('unmonitored', this)">
                                 <i data-lucide="eye-off"></i>
@@ -469,11 +469,19 @@
                                     </select>
                                 </div>
                                 <div class="filter-dropdown">
-                                    <label for="report-used-by-us">Χρήση από Εμάς</label>
-                                    <select id="report-used-by-us" onchange="runReport()">
+                                    <label for="report-ansible">Ansible</label>
+                                    <select id="report-ansible" onchange="runReport()">
                                         <option value="">Όλα</option>
-                                        <option value="1">Εμείς (Internal)</option>
-                                        <option value="0">Τρίτοι (External)</option>
+                                        <option value="1">Ναι</option>
+                                        <option value="0">Όχι</option>
+                                    </select>
+                                </div>
+                                <div class="filter-dropdown">
+                                    <label for="report-docker">Docker</label>
+                                    <select id="report-docker" onchange="runReport()">
+                                        <option value="">Όλα</option>
+                                        <option value="1">Ναι</option>
+                                        <option value="0">Όχι</option>
                                     </select>
                                 </div>
                             </div>
@@ -893,10 +901,17 @@
                         </div>
                         <div class="checkbox-control">
                             <label class="switch switch-small">
-                                <input type="checkbox" id="vm-used-by-us" checked>
+                                <input type="checkbox" id="vm-ansible">
                                 <span class="slider"></span>
                             </label>
-                            <span>Χρήση από Εμάς (Internal)</span>
+                            <span>Ansible</span>
+                        </div>
+                        <div class="checkbox-control">
+                            <label class="switch switch-small">
+                                <input type="checkbox" id="vm-docker">
+                                <span class="slider"></span>
+                            </label>
+                            <span>Docker</span>
                         </div>
                         <div class="checkbox-control" data-customfield="monitored">
                             <label class="switch switch-small">
