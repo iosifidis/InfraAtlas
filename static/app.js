@@ -647,7 +647,7 @@ function renderVMs() {
     tbody.innerHTML = '';
 
     if (state.vms.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" class="text-secondary" style="text-align: center; padding: 2rem;">Δεν βρέθηκαν VMs με τα τρέχοντα κριτήρια.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-secondary" style="text-align: center; padding: 2rem;">Δεν βρέθηκαν VMs με τα τρέχοντα κριτήρια.</td></tr>`;
         return;
     }
 
@@ -693,7 +693,6 @@ function renderVMs() {
                     ${badgesHtml}
                 </div>
             </td>
-            <td class="col-contact"><span style="font-size:0.8125rem;">${escapeHTML(v.contact_person || 'Εμείς')}</span></td>
             <td class="actions-col col-actions">
                 <div class="table-actions">
                     <button class="btn-icon-only" onclick="event.stopPropagation(); openVMModal(${v.id})" title="Επεξεργασία"><i data-lucide="edit-3"></i></button>
@@ -1552,7 +1551,6 @@ function renderReportTable(vms) {
             <th>Σε Χρήση</th>
             <th>Σημαντικό</th>
             <th>Docker / Ansible</th>
-            <th>Υπεύθυνος</th>
         </tr>
     `;
 
@@ -1572,7 +1570,7 @@ function renderReportTable(vms) {
     }
 
     if (vms.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="9" class="text-secondary" style="text-align: center; padding: 2rem;">Δεν βρέθηκαν αποτελέσματα για αυτή την αναφορά.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" class="text-secondary" style="text-align: center; padding: 2rem;">Δεν βρέθηκαν αποτελέσματα για αυτή την αναφορά.</td></tr>`;
         return;
     }
 
@@ -1613,7 +1611,6 @@ function renderReportTable(vms) {
                     <span class="badge ${v.ansible === 1 ? 'badge-info' : 'badge-secondary'}" style="${v.ansible === 0 ? 'opacity:0.6;' : ''}">Ansible: ${v.ansible === 1 ? 'Ναι' : 'Όχι'}</span>
                 </div>
             </td>
-            <td><span style="font-size: 0.75rem;">${escapeHTML(v.contact_person || 'Εμείς')}</span></td>
         `;
         tbody.appendChild(row);
     });
