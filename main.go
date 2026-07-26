@@ -7,7 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"strings"
+	"path/filepath"
 )
 
 //go:embed static
@@ -19,8 +19,7 @@ func main() {
 	flag.Parse()
 
 	// Ensure the database directory exists
-	if idx := strings.LastIndex(*dbPath, "/"); idx != -1 {
-		dbDir := (*dbPath)[:idx]
+	if dbDir := filepath.Dir(*dbPath); dbDir != "." {
 		if err := os.MkdirAll(dbDir, 0755); err != nil {
 			log.Fatalf("Failed to create database directory: %v", err)
 		}

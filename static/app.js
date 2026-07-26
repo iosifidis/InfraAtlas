@@ -68,7 +68,7 @@ function updateAuthUI() {
         title.textContent = 'Αρχική Ρύθμιση InfraAtlas';
         subtitle.textContent = 'Δημιουργήστε τον πρώτο λογαριασμό διαχειριστή για να ξεκινήσετε.';
         submitBtn.innerHTML = `<span>Δημιουργία & Είσοδος</span><i data-lucide="shield-check"></i>`;
-        lucide.createIcons();
+        lucide.createIcons({ nodes: [submitBtn] });
     } else if (!state.loggedIn) {
         // Standard Login Mode
         overlay.classList.remove('hidden');
@@ -78,7 +78,7 @@ function updateAuthUI() {
         title.textContent = 'Σύνδεση στο InfraAtlas';
         subtitle.textContent = 'Παρακαλώ εισάγετε τα στοιχεία σας.';
         submitBtn.innerHTML = `<span>Είσοδος</span><i data-lucide="log-in"></i>`;
-        lucide.createIcons();
+        lucide.createIcons({ nodes: [submitBtn] });
     } else {
         // Authenticated State
         overlay.classList.add('hidden');
@@ -138,7 +138,7 @@ function showAlert(message) {
     const alertBox = document.getElementById('auth-alert');
     alertBox.innerHTML = `<i data-lucide="alert-circle"></i><span>${message}</span>`;
     alertBox.classList.remove('hidden');
-    lucide.createIcons();
+    lucide.createIcons({ nodes: [alertBox] });
 }
 
 // -------------------------------------------------------------
@@ -546,7 +546,7 @@ function renderStatsDashboard() {
         }
     }
     
-    lucide.createIcons();
+    lucide.createIcons({ nodes: [document.getElementById('tab-dashboard')] });
 
     // Render Cluster Resources Table
     const tbody = document.getElementById('cluster-resources-tbody');
@@ -587,7 +587,7 @@ function renderClusters() {
                 <p class="text-secondary" style="margin-top: 0.5rem;">Ξεκινήστε προσθέτοντας ένα νέο cluster διαχείρισης VM.</p>
             </div>
         `;
-        lucide.createIcons();
+        lucide.createIcons({ nodes: [container] });
         return;
     }
 
@@ -610,7 +610,7 @@ function renderClusters() {
         container.appendChild(card);
     });
 
-    lucide.createIcons();
+    lucide.createIcons({ nodes: [container] });
 }
 
 function populateClusterDropdowns() {
@@ -703,7 +703,7 @@ function renderVMs() {
         tbody.appendChild(row);
     });
 
-    lucide.createIcons();
+    lucide.createIcons({ nodes: [tbody] });
 }
 
 // -------------------------------------------------------------
@@ -932,7 +932,7 @@ function openDeleteModal(type, id) {
     }
 
     modal.classList.remove('hidden');
-    lucide.createIcons();
+    lucide.createIcons({ nodes: [modal.querySelector('.modal-box')] });
     openFocusTrap(modal.querySelector('.modal-box'), _trigger);
 }
 
@@ -1064,7 +1064,7 @@ function renderDNSRecords() {
         tbody.appendChild(row);
     });
 
-    lucide.createIcons();
+    lucide.createIcons({ nodes: [tbody] });
 }
 
 function openDNSModal(id = null) {
@@ -1471,7 +1471,7 @@ function renderUnmatchedDNSTable(records) {
         tbody.appendChild(row);
     });
 
-    lucide.createIcons();
+    lucide.createIcons({ nodes: [tbody] });
     state.currentReportData = records;
 }
 
@@ -1533,7 +1533,7 @@ function renderUnmatchedVMsTable(vms) {
         tbody.appendChild(row);
     });
 
-    lucide.createIcons();
+    lucide.createIcons({ nodes: [tbody] });
     state.currentReportData = vms;
 }
 
@@ -1615,7 +1615,8 @@ function renderReportTable(vms) {
         tbody.appendChild(row);
     });
 
-    lucide.createIcons();
+    lucide.createIcons({ nodes: [tbody] });
+
 
     state.currentReportData = vms;
 }
