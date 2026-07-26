@@ -124,7 +124,7 @@ func migrate() error {
 			extra_disk REAL DEFAULT 0,
 			ipv4 TEXT,
 			ipv6 TEXT,
-			vpn TEXT,
+			vpn INTEGER DEFAULT 0,
 			backup TEXT,
 			monitored INTEGER DEFAULT 0,
 			os_upgrade INTEGER DEFAULT 0,
@@ -170,6 +170,14 @@ func migrate() error {
 	// Auto-migrations for new columns on existing database files
 	DB.Exec("ALTER TABLE vms ADD COLUMN os_upgrade INTEGER DEFAULT 0;")
 	DB.Exec("ALTER TABLE vms ADD COLUMN app_upgrade INTEGER DEFAULT 0;")
+
+	// Migration: fix vpn column TEXT → INTEGER (SQLite RENAME COLUMN: v3.25+)
+	DB.Exec(`ALTER TABLE vms RENAME COLUMN vpn TO vpn_legacy;`)
+	DB.Exec(`ALTER TABLE vms ADD COLUMN vpn INTEGER DEFAULT 0;`)
+	DB.Exec(`UPDATE vms SET vpn = 1
+		WHERE LOWER(COALESCE(vpn_legacy,'')) IN ('1','true','yes','nai','ναι')
+		   OR LOWER(COALESCE(vpn_legacy,'')) LIKE '%vpn%'
+		   OR LOWER(COALESCE(vpn_legacy,'')) LIKE '%client%';`)
 	DB.Exec("ALTER TABLE vms ADD COLUMN ansible INTEGER DEFAULT 0;")
 	DB.Exec("ALTER TABLE vms ADD COLUMN docker INTEGER DEFAULT 0;")
 
@@ -202,6 +210,9 @@ func GetClusters() ([]Cluster, error) {
 		}
 		c.Description = desc.String
 		clusters = append(clusters, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return clusters, nil
 }
@@ -315,7 +326,8 @@ func GetVMs(clusterID int64, inUse *int, isImportant *int, monitored *int, searc
 	var vms []VM
 	for rows.Next() {
 		var v VM
-		var pass, url, ipv4, ipv6, vpn, backup, os, osVer, contact, desc sql.NullString
+		var pass, url, ipv4, ipv6, backup, os, osVer, contact, desc sql.NullString
+		var vpn sql.NullInt64
 		err := rows.Scan(
 			&v.ID, &v.ClusterID, &v.ClusterName, &v.Name, &pass, &url,
 			&v.InUse, &v.IsImportant, &v.UsedByUs, &v.Ansible, &v.Docker, &v.CPU, &v.RAM, &v.Disk, &v.ExtraDisk,
@@ -329,13 +341,16 @@ func GetVMs(clusterID int64, inUse *int, isImportant *int, monitored *int, searc
 		v.URL = url.String
 		v.IPv4 = ipv4.String
 		v.IPv6 = ipv6.String
-		v.VPN = parseBoolInt(vpn.String)
+		v.VPN = int(vpn.Int64)
 		v.Backup = backup.String
 		v.OS = os.String
 		v.OSVersion = osVer.String
 		v.ContactPerson = contact.String
 		v.Description = desc.String
 		vms = append(vms, v)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return vms, nil
 }
@@ -353,7 +368,8 @@ func parseBoolInt(s string) int {
 
 func GetVM(id int64) (VM, error) {
 	var v VM
-	var pass, url, ipv4, ipv6, vpn, backup, os, osVer, contact, desc sql.NullString
+	var pass, url, ipv4, ipv6, backup, os, osVer, contact, desc sql.NullString
+	var vpn sql.NullInt64
 	query := `
 		SELECT v.id, v.cluster_id, c.name as cluster_name, v.name, v.default_password, v.url, 
 		       v.in_use, v.is_important, v.used_by_us, v.ansible, v.docker, v.cpu, v.ram, v.disk, v.extra_disk, 
@@ -376,7 +392,7 @@ func GetVM(id int64) (VM, error) {
 	v.URL = url.String
 	v.IPv4 = ipv4.String
 	v.IPv6 = ipv6.String
-	v.VPN = parseBoolInt(vpn.String)
+	v.VPN = int(vpn.Int64)
 	v.Backup = backup.String
 	v.OS = os.String
 	v.OSVersion = osVer.String
@@ -479,6 +495,9 @@ func GetDNSRecords(search, recType string) ([]DNSRecord, error) {
 		}
 		r.Description = desc.String
 		records = append(records, r)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return records, nil
 }
@@ -592,6 +611,9 @@ func GetSettings() (map[string]string, error) {
 			return nil, err
 		}
 		settings[k] = v
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
 	}
 	return settings, nil
 }

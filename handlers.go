@@ -17,19 +17,46 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-// Session structure for in-memory auth
+// sessionData holds the username and expiry for an in-memory session.
+type sessionData struct {
+	username  string
+	expiresAt time.Time
+}
+
+const sessionDuration = 24 * time.Hour
+
 var sessions = struct {
 	sync.RWMutex
-	m map[string]string // token -> username
-}{m: make(map[string]string)}
+	m map[string]sessionData // token → sessionData
+}{m: make(map[string]sessionData)}
 
 // Session expiry helper or simple token validation
 const sessionCookieName = "session_token"
 
-func generateToken() string {
+func generateToken() (string, error) {
 	b := make([]byte, 32)
-	rand.Read(b)
-	return base64.URLEncoding.EncodeToString(b)
+	if _, err := rand.Read(b); err != nil {
+		return "", fmt.Errorf("failed to generate secure token: %w", err)
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
+}
+
+// startSessionCleanup purges expired sessions once per hour.
+func startSessionCleanup() {
+	go func() {
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for range ticker.C {
+			now := time.Now()
+			sessions.Lock()
+			for token, data := range sessions.m {
+				if now.After(data.expiresAt) {
+					delete(sessions.m, token)
+				}
+			}
+			sessions.Unlock()
+		}
+	}()
 }
 
 // Helpers for JSON responses
@@ -40,13 +67,14 @@ func respondWithError(w http.ResponseWriter, code int, message string) {
 func respondWithJSON(w http.ResponseWriter, code int, payload interface{}) {
 	response, err := json.Marshal(payload)
 	if err != nil {
+		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte(`{"error": "Failed to marshal JSON response"}`))
+		_, _ = w.Write([]byte(`{"error": "Failed to marshal JSON response"}`))
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(code)
-	w.Write(response)
+	_, _ = w.Write(response)
 }
 
 // Middleware to check authentication
@@ -83,16 +111,20 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		sessions.RLock()
-		username, exists := sessions.m[cookie.Value]
+		data, exists := sessions.m[cookie.Value]
 		sessions.RUnlock()
 
-		if !exists {
+		if !exists || time.Now().After(data.expiresAt) {
+			if exists {
+				sessions.Lock()
+				delete(sessions.m, cookie.Value)
+				sessions.Unlock()
+			}
 			respondWithError(w, http.StatusUnauthorized, "Unauthorized: Session invalid or expired")
 			return
 		}
 
-		// Session is valid. Put username in request header or context if needed (optional)
-		r.Header.Set("X-Authenticated-User", username)
+		r.Header.Set("X-Authenticated-User", data.username)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -115,8 +147,9 @@ func handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(sessionCookieName)
 	if err == nil {
 		sessions.RLock()
-		_, loggedIn = sessions.m[cookie.Value]
+		data, ok := sessions.m[cookie.Value]
 		sessions.RUnlock()
+		loggedIn = ok && time.Now().Before(data.expiresAt)
 	}
 
 	respondWithJSON(w, http.StatusOK, map[string]bool{
@@ -168,9 +201,13 @@ func handleAuthSetup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Automate login for setup user
-	token := generateToken()
+	token, err := generateToken()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to generate session token")
+		return
+	}
 	sessions.Lock()
-	sessions.m[token] = req.Username
+	sessions.m[token] = sessionData{username: req.Username, expiresAt: time.Now().Add(sessionDuration)}
 	sessions.Unlock()
 
 	http.SetCookie(w, &http.Cookie{
@@ -211,9 +248,13 @@ func handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token := generateToken()
+	token, err := generateToken()
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to generate session token")
+		return
+	}
 	sessions.Lock()
-	sessions.m[token] = u.Username
+	sessions.m[token] = sessionData{username: u.Username, expiresAt: time.Now().Add(sessionDuration)}
 	sessions.Unlock()
 
 	http.SetCookie(w, &http.Cookie{
@@ -320,7 +361,10 @@ func handleAuthProfile(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie(sessionCookieName)
 			if err == nil {
 				sessions.Lock()
-				sessions.m[cookie.Value] = req.Username
+				if data, ok := sessions.m[cookie.Value]; ok {
+					data.username = req.Username
+					sessions.m[cookie.Value] = data
+				}
 				sessions.Unlock()
 			}
 		}
@@ -722,7 +766,10 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=vms-report-%s.csv", time.Now().Format("2006-01-02")))
 
 	// Write UTF-8 BOM so Excel opens it with correct Greek character encoding
-	w.Write([]byte{0xEF, 0xBB, 0xBF})
+	if _, err := w.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to write response")
+		return
+	}
 
 	// CSV Header
 	headers := []string{

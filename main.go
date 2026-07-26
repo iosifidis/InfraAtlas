@@ -31,6 +31,7 @@ func main() {
 	if err := InitDB(*dbPath); err != nil {
 		log.Fatalf("Failed to initialize database: %v", err)
 	}
+	startSessionCleanup()
 
 	// Get sub-filesystem for static files
 	subFS, err := fs.Sub(staticFS, "static")
