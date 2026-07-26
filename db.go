@@ -258,8 +258,7 @@ func DeleteCluster(id int64) error {
 }
 
 func GetOrCreateClusterByName(name string) (int64, error) {
-	name = fmt.Sprintf("%v", name)
-	name = fmt.Sprintf("%s", name)
+	name = strings.TrimSpace(name)
 	if name == "" {
 		name = "General Cluster"
 	}

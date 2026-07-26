@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/crypto/bcrypt"
@@ -32,6 +33,10 @@ var sessions = struct {
 
 // Session expiry helper or simple token validation
 const sessionCookieName = "session_token"
+
+// setupCompleted caches whether the first admin has been created,
+// avoiding a HasUsers() DB query on every authenticated API request.
+var setupCompleted atomic.Bool
 
 func generateToken() (string, error) {
 	b := make([]byte, 32)
@@ -92,15 +97,18 @@ func AuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Check if setup is completed. If not, block other requests.
-		hasUsers, err := HasUsers()
-		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Database error checking users")
-			return
-		}
-		if !hasUsers {
-			respondWithError(w, http.StatusForbidden, "Setup required")
-			return
+		// Check setup once; cache the result to skip DB on every request.
+		if !setupCompleted.Load() {
+			hasUsers, err := HasUsers()
+			if err != nil {
+				respondWithError(w, http.StatusInternalServerError, "Database error checking users")
+				return
+			}
+			if !hasUsers {
+				respondWithError(w, http.StatusForbidden, "Setup required")
+				return
+			}
+			setupCompleted.Store(true)
 		}
 
 		// Check session cookie
@@ -199,6 +207,7 @@ func handleAuthSetup(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusInternalServerError, "Failed to save administrator")
 		return
 	}
+	setupCompleted.Store(true)
 
 	// Automate login for setup user
 	token, err := generateToken()
@@ -771,20 +780,21 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// CSV Header
+	cw := csv.NewWriter(w)
+	cw.Comma = ';'
+
 	headers := []string{
 		"Όνομα VM", "Cluster", "URL", "Σε Χρήση", "Σημαντικό", "Χρήση από Εμάς",
 		"CPU", "RAM", "Δίσκος", "Extra Δίσκος", "IPv4", "IPv6",
 		"VPN", "Backup", "Monitored", "OS", "OS Version", "Υπεύθυνος Επικοινωνίας", "Περιγραφή",
 	}
-
-	fmt.Fprintf(w, "%s\n", strings.Join(headers, ";")) // using semicolon as delimiter is more Excel-friendly in European locales
+	_ = cw.Write(headers)
 
 	for _, v := range vms {
 		row := []string{
-			escapeCSV(v.Name),
-			escapeCSV(v.ClusterName),
-			escapeCSV(v.URL),
+			v.Name,
+			v.ClusterName,
+			v.URL,
 			boolToGreek(v.InUse),
 			boolToGreek(v.IsImportant),
 			boolToGreek(v.UsedByUs),
@@ -792,29 +802,21 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 			fmt.Sprintf("%.1f", v.RAM),
 			fmt.Sprintf("%.1f", v.Disk),
 			fmt.Sprintf("%.1f", v.ExtraDisk),
-			escapeCSV(v.IPv4),
-			escapeCSV(v.IPv6),
+			v.IPv4,
+			v.IPv6,
 			boolToGreek(v.VPN),
-			escapeCSV(v.Backup),
+			v.Backup,
 			boolToGreek(v.Monitored),
-			escapeCSV(v.OS),
-			escapeCSV(v.OSVersion),
-			escapeCSV(v.ContactPerson),
-			escapeCSV(v.Description),
+			v.OS,
+			v.OSVersion,
+			v.ContactPerson,
+			v.Description,
 		}
-		fmt.Fprintf(w, "%s\n", strings.Join(row, ";"))
+		_ = cw.Write(row)
 	}
+	cw.Flush()
 }
 
-func escapeCSV(s string) string {
-	s = strings.ReplaceAll(s, "\n", " ")
-	s = strings.ReplaceAll(s, "\r", " ")
-	if strings.ContainsAny(s, `;"`) {
-		s = strings.ReplaceAll(s, `"`, `""`)
-		return `"` + s + `"`
-	}
-	return s
-}
 
 func boolToGreek(val int) string {
 	if val == 1 {
@@ -1042,7 +1044,7 @@ type parsedVMItem struct {
 	clusterName string
 }
 
-func ImportVMsHandler(w http.ResponseWriter, r *http.Request) {
+func importVMsHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
@@ -1105,6 +1107,27 @@ func ImportVMsHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func parseVMCSV(content string) ([]parsedVMItem, error) {
+	// Column indices for the expected CSV format
+	const (
+		colName    = 0
+		colURL     = 1
+		colInUse   = 2
+		colImport  = 3
+		colCPU     = 5
+		colRAM     = 6
+		colDisk    = 7
+		colExtra   = 8
+		colIPv4    = 9
+		colIPv6    = 10
+		colVPN     = 11
+		colBackup  = 12
+		colMonitor = 13
+		colOS      = 14
+		colOSVer   = 15
+		colCluster = 17
+		colContact = 18
+		colDesc    = 19
+	)
 	r := csv.NewReader(strings.NewReader(content))
 	r.FieldsPerRecord = -1 // allow variable column counts
 	r.LazyQuotes = true

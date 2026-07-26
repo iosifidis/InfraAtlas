@@ -33,6 +33,11 @@ func main() {
 	}
 	startSessionCleanup()
 
+	// Prime the setup cache so the first API request skips a DB query.
+	if hasUsers, _ := HasUsers(); hasUsers {
+		setupCompleted.Store(true)
+	}
+
 	// Get sub-filesystem for static files
 	subFS, err := fs.Sub(staticFS, "static")
 	if err != nil {
@@ -65,7 +70,7 @@ func main() {
 	// VMs API
 	apiMux.HandleFunc("GET /api/vms", handleVMs)
 	apiMux.HandleFunc("POST /api/vms", handleVMs)
-	apiMux.HandleFunc("POST /api/vms/import", ImportVMsHandler)
+	apiMux.HandleFunc("POST /api/vms/import", importVMsHandler)
 	apiMux.HandleFunc("GET /api/vms/{id}", handleVMDetail)
 	apiMux.HandleFunc("PUT /api/vms/{id}", handleVMDetail)
 	apiMux.HandleFunc("DELETE /api/vms/{id}", handleVMDetail)
