@@ -1335,9 +1335,8 @@ function applyReportPreset(preset, btnElem) {
     }
 
     // Apply specific preset configurations
-    if (preset === 'unused-important') {
-        document.getElementById('report-in-use').value = '0';
-        document.getElementById('report-important').value = '1';
+    if (preset === 'ansible-vms') {
+        document.getElementById('report-ansible').value = '1';
     } else if (preset === 'docker-vms') {
         document.getElementById('report-docker').value = '1';
     } else if (preset === 'unmonitored') {
@@ -1562,8 +1561,8 @@ function renderReportTable(vms) {
     document.getElementById('report-results-count').textContent = `${vms.length} VMs`;
 
     const resultsTitle = document.getElementById('report-results-title');
-    if (state.activeReportPreset === 'unused-important') {
-        resultsTitle.textContent = 'Ανενεργά Σημαντικά VMs (Προς Έλεγχο/Διαγραφή)';
+    if (state.activeReportPreset === 'ansible-vms') {
+        resultsTitle.textContent = 'Virtual Machines Διαχειριζόμενα μέσω Ansible';
     } else if (state.activeReportPreset === 'docker-vms') {
         resultsTitle.textContent = 'Virtual Machines με Εγκατάσταση Docker';
     } else if (state.activeReportPreset === 'unmonitored') {
