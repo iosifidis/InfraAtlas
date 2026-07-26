@@ -14,6 +14,8 @@ const state = {
     stats: {},
     settings: {},
     deleteTarget: null, // { type: 'cluster'|'vm'|'dns', id: number }
+    currentReportData: [],
+    activeReportPreset: null,
 };
 
 // Default Form Customization Settings (if not configured in DB)
@@ -200,6 +202,27 @@ function setupEventListeners() {
 
     // Delete Modal confirmation button
     document.getElementById('delete-confirm-btn').addEventListener('click', confirmDeletion);
+
+    // ESC key closes any open modal
+    document.addEventListener('keydown', (e) => {
+        if (e.key !== 'Escape') return;
+        const openModal = document.querySelector('.modal-overlay:not(.hidden)');
+        if (!openModal) return;
+        const id = openModal.id;
+        if (id === 'cluster-modal')    closeClusterModal();
+        else if (id === 'vm-modal')    closeVMModal();
+        else if (id === 'dns-modal')   closeDNSModal();
+        else if (id === 'dns-import-modal') closeDNSImportModal();
+        else if (id === 'vm-import-modal')  closeVMImportModal();
+        else if (id === 'profile-modal')    closeProfileModal();
+        else if (id === 'delete-modal')     closeDeleteModal();
+    });
+
+    // Debounced search inputs (300ms delay)
+    const debouncedFetchVMs  = debounce(fetchVMs,  300);
+    const debouncedFetchDNS  = debounce(fetchDNSRecords, 300);
+    document.getElementById('vm-search').addEventListener('input',  debouncedFetchVMs);
+    document.getElementById('dns-search').addEventListener('input', debouncedFetchDNS);
 }
 
 function switchTab(tabId) {
@@ -396,9 +419,9 @@ function saveSettings(e) {
         state.settings = payload;
         applySettingsToUI();
         fetchStats();
-        alert("Οι ρυθμίσεις αποθηκεύτηκαν με επιτυχία!");
+        showToast('Οι ρυθμίσεις αποθηκεύτηκαν με επιτυχία!', 'success');
     })
-    .catch(err => alert("Αποτυχία αποθήκευσης ρυθμίσεων: " + err));
+    .catch(err => showToast('Αποτυχία αποθήκευσης ρυθμίσεων: ' + err.message, 'error'));
 }
 
 // -------------------------------------------------------------
@@ -688,6 +711,7 @@ function renderVMs() {
 // -------------------------------------------------------------
 
 function openClusterModal(id = null) {
+    const _trigger = document.activeElement;
     const modal = document.getElementById('cluster-modal');
     const title = document.getElementById('cluster-modal-title');
     const form = document.getElementById('cluster-form');
@@ -708,9 +732,11 @@ function openClusterModal(id = null) {
     }
 
     modal.classList.remove('hidden');
+    openFocusTrap(modal.querySelector('.modal-box'), _trigger);
 }
 
 function closeClusterModal() {
+    closeFocusTrap();
     document.getElementById('cluster-modal').classList.add('hidden');
 }
 
@@ -739,7 +765,7 @@ function saveCluster(e) {
         fetchClusters();
         fetchStats();
     })
-    .catch(err => alert(err.message));
+    .catch(err => showToast(err.message, 'error'));
 }
 
 // -------------------------------------------------------------
@@ -747,6 +773,7 @@ function saveCluster(e) {
 // -------------------------------------------------------------
 
 function openVMModal(id = null) {
+    const _trigger = document.activeElement;
     const modal = document.getElementById('vm-modal');
     const title = document.getElementById('vm-modal-title');
     const form = document.getElementById('vm-form');
@@ -784,7 +811,7 @@ function openVMModal(id = null) {
                 
                 document.getElementById('vm-ipv4').value = v.ipv4 || '';
                 document.getElementById('vm-ipv6').value = v.ipv6 || '';
-                document.getElementById('vm-vpn').value = v.vpn || '';
+                document.getElementById('vm-vpn').checked = v.vpn === 1;
                 document.getElementById('vm-backup').value = v.backup || '';
                 document.getElementById('vm-contact').value = v.contact_person || '';
                 document.getElementById('vm-desc').value = v.description || '';
@@ -793,13 +820,13 @@ function openVMModal(id = null) {
                 document.getElementById('vm-is-important').checked = v.is_important === 1;
                 document.getElementById('vm-used-by-us').checked = v.used_by_us === 1;
                 document.getElementById('vm-monitored').checked = v.monitored === 1;
-                document.getElementById('vm-vpn').checked = v.vpn === 1;
                 document.getElementById('vm-os-upgrade').checked = v.os_upgrade === 1;
                 document.getElementById('vm-app-upgrade').checked = v.app_upgrade === 1;
                 
                 modal.classList.remove('hidden');
+                openFocusTrap(modal.querySelector('.modal-box'), _trigger);
             })
-            .catch(err => alert("Αποτυχία φόρτωσης VM: " + err));
+            .catch(err => showToast('Αποτυχία φόρτωσης VM: ' + err.message, 'error'));
     } else {
         title.textContent = 'Καταγραφή Νέου Virtual Machine';
         
@@ -814,10 +841,12 @@ function openVMModal(id = null) {
         }
         
         modal.classList.remove('hidden');
+        openFocusTrap(modal.querySelector('.modal-box'), _trigger);
     }
 }
 
 function closeVMModal() {
+    closeFocusTrap();
     document.getElementById('vm-modal').classList.add('hidden');
 }
 
@@ -877,7 +906,7 @@ function saveVM(e) {
         fetchVMs();
         fetchStats();
     })
-    .catch(err => alert(err.message));
+    .catch(err => showToast(err.message, 'error'));
 }
 
 // -------------------------------------------------------------
@@ -885,6 +914,7 @@ function saveVM(e) {
 // -------------------------------------------------------------
 
 function openDeleteModal(type, id) {
+    const _trigger = document.activeElement;
     state.deleteTarget = { type, id };
     const modal = document.getElementById('delete-modal');
     const msg = document.getElementById('delete-modal-message');
@@ -899,9 +929,11 @@ function openDeleteModal(type, id) {
 
     modal.classList.remove('hidden');
     lucide.createIcons();
+    openFocusTrap(modal.querySelector('.modal-box'), _trigger);
 }
 
 function closeDeleteModal() {
+    closeFocusTrap();
     document.getElementById('delete-modal').classList.add('hidden');
     state.deleteTarget = null;
 }
@@ -929,7 +961,7 @@ function confirmDeletion() {
         })
         .catch(err => {
             closeDeleteModal();
-            alert(err.message);
+            showToast(err.message, 'error');
         });
 }
 
@@ -1032,6 +1064,7 @@ function renderDNSRecords() {
 }
 
 function openDNSModal(id = null) {
+    const _trigger = document.activeElement;
     const modal = document.getElementById('dns-modal');
     const title = document.getElementById('dns-modal-title');
     const form = document.getElementById('dns-form');
@@ -1054,9 +1087,11 @@ function openDNSModal(id = null) {
     }
 
     modal.classList.remove('hidden');
+    openFocusTrap(modal.querySelector('.modal-box'), _trigger);
 }
 
 function closeDNSModal() {
+    closeFocusTrap();
     document.getElementById('dns-modal').classList.add('hidden');
 }
 
@@ -1086,19 +1121,22 @@ function saveDNSRecord(e) {
         closeDNSModal();
         fetchDNSRecords();
     })
-    .catch(err => alert(err.message));
+    .catch(err => showToast(err.message, 'error'));
 }
 
 function openDNSImportModal() {
+    const _trigger = document.activeElement;
     const modal = document.getElementById('dns-import-modal');
     const form = document.getElementById('dns-import-form');
     const alertBox = document.getElementById('dns-import-alert');
     form.reset();
     alertBox.classList.add('hidden');
     modal.classList.remove('hidden');
+    openFocusTrap(modal.querySelector('.modal-box'), _trigger);
 }
 
 function closeDNSImportModal() {
+    closeFocusTrap();
     document.getElementById('dns-import-modal').classList.add('hidden');
 }
 
@@ -1161,7 +1199,7 @@ function submitDNSImport(e) {
             alertBox.classList.remove('hidden');
         });
     } else {
-        alert("Παρακαλώ επιλέξτε αρχείο zonefile ή επικολλήστε περιεχόμενο.");
+        showToast('Παρακαλώ επιλέξτε αρχείο zonefile ή επικολλήστε περιεχόμενο.', 'error');
     }
 }
 
@@ -1574,7 +1612,7 @@ function exportReportCSV() {
     if (state.activeReportPreset === 'unmatched-dns' || state.activeReportPreset === 'unmatched-vms') {
         const items = state.currentReportData || [];
         if (items.length === 0) {
-            alert('Δεν υπάρχουν δεδομένα προς εξαγωγή.');
+            showToast('Δεν υπάρχουν δεδομένα προς εξαγωγή.', 'error');
             return;
         }
         let csvContent = 'data:text/csv;charset=utf-8,\uFEFF';
@@ -1617,15 +1655,18 @@ function printReport() {
 }
 
 function openVMImportModal() {
+    const _trigger = document.activeElement;
     const modal = document.getElementById('vm-import-modal');
     const form = document.getElementById('vm-import-form');
     const alertBox = document.getElementById('vm-import-alert');
     form.reset();
     alertBox.classList.add('hidden');
     modal.classList.remove('hidden');
+    openFocusTrap(modal.querySelector('.modal-box'), _trigger);
 }
 
 function closeVMImportModal() {
+    closeFocusTrap();
     document.getElementById('vm-import-modal').classList.add('hidden');
 }
 
@@ -1637,8 +1678,6 @@ function submitVMImport(e) {
 
     const handleSuccess = (data) => {
         alertBox.className = 'alert alert-success';
-        alertBox.style.backgroundColor = 'var(--success-bg)';
-        alertBox.style.color = 'var(--success)';
         alertBox.textContent = `Επιτυχία! Εισήχθησαν ${data.inserted} νέα VMs και ενημερώθηκαν ${data.updated}.`;
         alertBox.classList.remove('hidden');
         setTimeout(() => {
@@ -1694,6 +1733,7 @@ function submitVMImport(e) {
 }
 
 function openProfileModal() {
+    const _trigger = document.activeElement;
     const modal = document.getElementById('profile-modal');
     const form = document.getElementById('profile-form');
     const alertBox = document.getElementById('profile-alert');
@@ -1709,13 +1749,15 @@ function openProfileModal() {
         .then(data => {
             document.getElementById('profile-username').value = data.username || 'admin';
             modal.classList.remove('hidden');
+            openFocusTrap(modal.querySelector('.modal-box'), _trigger);
         })
         .catch(err => {
-            alert('Σφάλμα: ' + err.message);
+            showToast('Σφάλμα: ' + err.message, 'error');
         });
 }
 
 function closeProfileModal() {
+    closeFocusTrap();
     document.getElementById('profile-modal').classList.add('hidden');
 }
 
@@ -1757,8 +1799,6 @@ function submitProfileUpdate(e) {
     })
     .then(data => {
         alertBox.className = 'alert alert-success';
-        alertBox.style.backgroundColor = 'var(--success-bg)';
-        alertBox.style.color = 'var(--success)';
         alertBox.textContent = data.message || 'Επιτυχής ενημέρωση!';
         alertBox.classList.remove('hidden');
 
@@ -1809,4 +1849,117 @@ function escapeHTML(str) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
         .replace(/'/g, '&#039;');
+}
+
+// -------------------------------------------------------------
+// Toast Notification System
+// -------------------------------------------------------------
+
+function showToast(message, type = 'info', duration = 4000) {
+    let container = document.getElementById('toast-container');
+    if (!container) {
+        container = document.createElement('div');
+        container.id = 'toast-container';
+        container.className = 'toast-container';
+        container.setAttribute('aria-live', 'polite');
+        container.setAttribute('aria-atomic', 'false');
+        document.body.appendChild(container);
+    }
+
+    const iconMap = { success: 'check-circle', error: 'alert-circle', info: 'info' };
+
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    toast.setAttribute('role', 'status');
+    toast.innerHTML = `
+        <i data-lucide="${iconMap[type] || 'info'}" class="toast-icon"></i>
+        <span class="toast-content">${escapeHTML(message)}</span>
+        <button class="toast-close" aria-label="Κλείσιμο ειδοποίησης">
+            <i data-lucide="x"></i>
+        </button>
+    `;
+
+    const dismiss = () => {
+        toast.classList.add('toast-exit');
+        toast.addEventListener('animationend', () => toast.remove(), { once: true });
+    };
+
+    toast.querySelector('.toast-close').addEventListener('click', dismiss);
+    container.appendChild(toast);
+    lucide.createIcons({ nodes: [toast] });
+
+    if (duration > 0) setTimeout(dismiss, duration);
+}
+
+// -------------------------------------------------------------
+// Utility: Debounce
+// -------------------------------------------------------------
+
+function debounce(fn, delay = 300) {
+    let timer;
+    return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+    };
+}
+
+// -------------------------------------------------------------
+// Utility: Focus Trap (WCAG 2.1.2)
+// Captures focus inside a modal and returns it to the trigger
+// element when the modal closes.
+// -------------------------------------------------------------
+
+let _focusTrap = null;
+
+const FOCUSABLE = [
+    'a[href]',
+    'button:not([disabled])',
+    'input:not([disabled])',
+    'select:not([disabled])',
+    'textarea:not([disabled])',
+    '[tabindex]:not([tabindex="-1"])'
+].join(',');
+
+function openFocusTrap(dialogEl, triggerEl) {
+    if (!dialogEl) return;
+
+    // Remove any previous trap
+    closeFocusTrap();
+
+    const getFocusable = () =>
+        [...dialogEl.querySelectorAll(FOCUSABLE)].filter(
+            el => !el.closest('.hidden') && getComputedStyle(el).display !== 'none'
+        );
+
+    const handler = (e) => {
+        if (e.key !== 'Tab') return;
+        const els = getFocusable();
+        if (els.length === 0) return;
+        const first = els[0];
+        const last  = els[els.length - 1];
+        if (e.shiftKey) {
+            if (document.activeElement === first) { e.preventDefault(); last.focus(); }
+        } else {
+            if (document.activeElement === last)  { e.preventDefault(); first.focus(); }
+        }
+    };
+
+    dialogEl.addEventListener('keydown', handler);
+    _focusTrap = { dialogEl, triggerEl, handler };
+
+    // Move focus to first focusable element on next frame
+    requestAnimationFrame(() => {
+        const els = getFocusable();
+        if (els.length > 0) els[0].focus();
+    });
+}
+
+function closeFocusTrap() {
+    if (!_focusTrap) return;
+    _focusTrap.dialogEl.removeEventListener('keydown', _focusTrap.handler);
+    const trigger = _focusTrap.triggerEl;
+    _focusTrap = null;
+    if (trigger && typeof trigger.focus === 'function') {
+        requestAnimationFrame(() => trigger.focus());
+    }
 }

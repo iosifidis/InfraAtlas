@@ -9,6 +9,7 @@
     --bg-card: rgba(17, 24, 39, 0.7);
     --bg-glass: rgba(17, 24, 39, 0.45);
     --border-color: rgba(255, 255, 255, 0.08);
+    --border: rgba(255, 255, 255, 0.08); /* alias for --border-color */
     --border-focus: #6366f1;
     
     --text-primary: #f3f4f6;
@@ -82,6 +83,7 @@ button, input, select, textarea {
 .text-muted { color: var(--text-muted); }
 .text-danger { color: var(--danger); }
 .text-right { text-align: right; }
+.text-warning { color: var(--warning); }
 .mt-3 { margin-top: 1rem; }
 .divider {
     border: 0;
@@ -103,6 +105,7 @@ button, input, select, textarea {
 .badge-danger { background: var(--danger-bg); color: var(--danger); }
 .badge-info { background: var(--info-bg); color: var(--info); }
 .badge-warning { background: var(--warning-bg); color: var(--warning); }
+.badge-primary { background: var(--primary-glow); color: var(--primary); }
 
 /* Glassmorphism panel styling */
 .glass {
@@ -349,6 +352,24 @@ input[type="file"]::file-selector-button:hover {
     background-color: var(--primary-hover);
 }
 
+/* Form input (used in Settings cards) */
+.form-input {
+    width: 100%;
+    padding: 0.65rem 0.875rem;
+    background-color: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.9rem;
+    color: #ffffff;
+    transition: var(--transition);
+}
+.form-input:focus {
+    outline: none;
+    border-color: var(--border-focus);
+    background-color: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.15);
+}
+
 .form-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
@@ -411,7 +432,7 @@ input:checked + .slider:before {
     left: 3px;
     bottom: 3px;
 }
-input:checked + .switch-small .slider:before {
+.switch-small input:checked + .slider:before {
     transform: translateX(18px);
 }
 
@@ -475,6 +496,11 @@ input:checked + .switch-small .slider:before {
     background-color: var(--danger-bg);
     color: var(--danger);
     border: 1px solid rgba(239, 68, 68, 0.2);
+}
+.alert-success {
+    background-color: var(--success-bg);
+    color: var(--success);
+    border: 1px solid rgba(16, 185, 129, 0.2);
 }
 
 /* -------------------------------------------------------------
@@ -1494,6 +1520,149 @@ input:checked + .switch-small .slider:before {
     
     .form-grid {
         grid-template-columns: 1fr;
+    }
+}
+
+/* -------------------------------------------------------------
+   Focus-Visible (Keyboard Navigation Accessibility)
+   ------------------------------------------------------------- */
+:focus-visible {
+    outline: 2px solid var(--primary);
+    outline-offset: 2px;
+    border-radius: 2px;
+}
+
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+    outline: none;
+}
+
+/* -------------------------------------------------------------
+   Prefers Reduced Motion
+   ------------------------------------------------------------- */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* -------------------------------------------------------------
+   Toast Notification System (top-right)
+   ------------------------------------------------------------- */
+.toast-container {
+    position: fixed;
+    top: 1.25rem;
+    right: 1.25rem;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    pointer-events: none;
+    max-width: 380px;
+    width: calc(100% - 2.5rem);
+}
+
+.toast {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius-md);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.2);
+    pointer-events: all;
+    animation: toastSlideIn 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    font-size: 0.875rem;
+    line-height: 1.4;
+    min-width: 260px;
+}
+
+.toast.toast-exit {
+    animation: toastSlideOut 0.25s ease-in forwards;
+}
+
+.toast-success {
+    background: rgba(16, 185, 129, 0.18);
+    border-color: rgba(16, 185, 129, 0.35);
+    color: #d1fae5;
+}
+
+.toast-error {
+    background: rgba(239, 68, 68, 0.18);
+    border-color: rgba(239, 68, 68, 0.35);
+    color: #fee2e2;
+}
+
+.toast-info {
+    background: rgba(99, 102, 241, 0.18);
+    border-color: rgba(99, 102, 241, 0.35);
+    color: #e0e7ff;
+}
+
+.toast-icon {
+    flex-shrink: 0;
+    width: 18px;
+    height: 18px;
+    margin-top: 1px;
+}
+
+.toast-success .toast-icon { color: var(--success); }
+.toast-error .toast-icon { color: var(--danger); }
+.toast-info .toast-icon { color: var(--primary); }
+
+.toast-content { flex-grow: 1; }
+
+.toast-close {
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.4);
+    padding: 0;
+    flex-shrink: 0;
+    transition: color 0.15s;
+    line-height: 1;
+}
+
+.toast-close:hover { color: #ffffff; }
+
+.toast-close svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+}
+
+@keyframes toastSlideIn {
+    from { opacity: 0; transform: translateX(calc(100% + 1.5rem)); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes toastSlideOut {
+    from { opacity: 1; transform: translateX(0); }
+    to   { opacity: 0; transform: translateX(calc(100% + 1.5rem)); }
+}
+
+@media (max-width: 480px) {
+    .toast-container {
+        top: auto;
+        bottom: 1rem;
+        right: 0.75rem;
+        left: 0.75rem;
+        max-width: 100%;
+        width: auto;
+    }
+    @keyframes toastSlideIn {
+        from { opacity: 0; transform: translateY(1rem); }
+        to   { opacity: 1; transform: translateY(0); }
     }
 }
 
