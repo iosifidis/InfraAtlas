@@ -8,7 +8,8 @@ const state = {
     loggedIn: false,
     activeTab: 'dashboard',
     clusters: [],
-    vms: [],
+    vms: null,
+    vmsLoaded: false,
     dnsRecords: [],
     dnsSort: { col: 'name', dir: 'asc' },
     stats: {},
@@ -148,7 +149,7 @@ function showAlert(message) {
 function initializeDashboard() {
     // Determine active tab from URL hash
     let hash = window.location.hash.substring(1);
-    if (!['dashboard', 'clusters', 'vms', 'dns', 'reports', 'settings'].includes(hash)) {
+    if (!['dashboard', 'clusters', 'vms', 'dns', 'upgrades', 'reports', 'settings'].includes(hash)) {
         hash = 'dashboard';
     }
     
@@ -271,6 +272,11 @@ function switchTab(tabId) {
             pageDesc.textContent = 'Διαχείριση και εισαγωγή εγγραφών A & CNAME από zonefile.';
             fetchDNSRecords();
             break;
+        case 'upgrades':
+            pageTitle.textContent = 'Αναβαθμίσεις';
+            pageDesc.textContent = 'Λίστα εικονικών μηχανών που απαιτούν αναβάθμιση λειτουργικού ή λογισμικού.';
+            renderUpgradesTab();
+            break;
         case 'reports':
             pageTitle.textContent = 'Αναφορές & Έλεγχος';
             pageDesc.textContent = 'Έλεγχος χρήσης, εντοπισμός ανενεργών πόρων και εξαγωγές.';
@@ -323,8 +329,10 @@ function fetchVMs() {
         .then(res => res.json())
         .then(data => {
             state.vms = data || [];
+            state.vmsLoaded = true;
             renderVMs();
             renderDashboard();
+            renderUpgradesTab();
         })
         .catch(err => console.error("Error loading VMs:", err));
 }
@@ -735,6 +743,172 @@ function renderVMs() {
     });
 
     lucide.createIcons({ nodes: [tbody] });
+}
+
+// -------------------------------------------------------------
+// Dynamic Rendering: Upgrades Tab & Quick Toggles
+// -------------------------------------------------------------
+
+function renderUpgradesTab() {
+    const tbody = document.getElementById('upgrades-tbody');
+    const summaryBadge = document.getElementById('upgrades-summary-badge');
+    if (!tbody) return;
+
+    if (!state.vmsLoaded) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-secondary" style="text-align: center; padding: 2.5rem;"><i data-lucide="loader-2" class="spin" style="margin-right: 0.5rem;"></i> Φόρτωση δεδομένων...</td></tr>`;
+        if (summaryBadge) {
+            summaryBadge.className = 'badge badge-info';
+            summaryBadge.textContent = 'Φόρτωση...';
+        }
+        lucide.createIcons({ nodes: [tbody] });
+        return;
+    }
+
+    tbody.innerHTML = '';
+
+    const needingUpgrade = (state.vms || []).filter(v => v.os_upgrade === 1 || v.app_upgrade === 1);
+    
+    // Sort: Priority (is_important === 1) first, then alphabetical by name (Same as Dashboard!)
+    needingUpgrade.sort((a, b) => (b.is_important || 0) - (a.is_important || 0) || a.name.localeCompare(b.name));
+
+    if (summaryBadge) {
+        summaryBadge.textContent = `${needingUpgrade.length} VMs προς αναβάθμιση`;
+        if (needingUpgrade.length > 0) {
+            summaryBadge.className = 'badge badge-warning';
+        } else {
+            summaryBadge.className = 'badge badge-success';
+            summaryBadge.textContent = 'Όλα τα VMs είναι ενημερωμένα!';
+        }
+    }
+
+    if (needingUpgrade.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-secondary" style="text-align: center; padding: 2.5rem;">✨ Δεν υπάρχουν εκκρεμείς αναβαθμίσεις! Όλα τα συστήματα είναι ενημερωμένα.</td></tr>`;
+        return;
+    }
+
+    needingUpgrade.forEach(v => {
+        const row = document.createElement('tr');
+        row.classList.add('vm-table-row', 'clickable-row');
+        row.setAttribute('title', 'Κάντε κλικ για προβολή / επεξεργασία VM');
+        row.onclick = (e) => {
+            if (e.target.closest('a') || e.target.closest('button') || e.target.closest('input') || e.target.closest('label')) return;
+            openVMModal(v.id);
+        };
+
+        const specsText = `CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}${v.extra_disk > 0 ? ' +' + v.extra_disk : ''}`;
+
+        let importantBadge = '';
+        if (v.is_important === 1) {
+            importantBadge = '<span class="badge badge-danger" style="margin-left: 6px;">Important</span>';
+        }
+
+        row.innerHTML = `
+            <td class="col-vm-info">
+                <div class="vm-row-flex">
+                    <div class="vm-main-details">
+                        <div class="vm-name-title">
+                            ${escapeHTML(v.name)}
+                            ${importantBadge}
+                        </div>
+                        <div class="vm-url-sub">
+                            ${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}
+                        </div>
+                    </div>
+                </div>
+            </td>
+            <td class="col-cluster"><span class="badge badge-info">${escapeHTML(v.cluster_name)}</span></td>
+            <td class="col-specs"><span style="font-size:0.8125rem;">${specsText}</span></td>
+            <td class="col-ipv4"><code style="font-size: 0.8125rem;">${escapeHTML(v.ipv4 || '-')}</code></td>
+            <td style="text-align: center;">
+                <label class="switch switch-small" title="Αναβάθμιση Λειτουργικού (OS)">
+                    <input type="checkbox" ${v.os_upgrade === 1 ? 'checked' : ''} onchange="toggleVMUpgrade(${v.id}, 'os_upgrade', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </td>
+            <td style="text-align: center;">
+                <label class="switch switch-small" title="Αναβάθμιση Λογισμικού (Software)">
+                    <input type="checkbox" ${v.app_upgrade === 1 ? 'checked' : ''} onchange="toggleVMUpgrade(${v.id}, 'app_upgrade', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    lucide.createIcons({ nodes: [tbody] });
+}
+
+const vmUpdatePromises = {};
+
+function toggleVMUpgrade(vmId, field, isChecked) {
+    const vm = (state.vms || []).find(v => v.id === vmId);
+    if (!vm) return;
+
+    const oldVal = vm[field] || 0;
+    const newVal = isChecked ? 1 : 0;
+
+    // 1. Immediately update in-memory state so UI updates instantly
+    vm[field] = newVal;
+    
+    // 2. Instantly re-render Upgrades Tab & Dashboard
+    renderUpgradesTab();
+    renderDashboard();
+
+    // 3. Queue network requests per VM ID to prevent out-of-order race conditions
+    const previousPromise = vmUpdatePromises[vmId] || Promise.resolve();
+
+    vmUpdatePromises[vmId] = previousPromise.then(() => {
+        const payload = {
+            cluster_id: vm.cluster_id,
+            name: vm.name,
+            default_password: vm.default_password || '',
+            url: vm.url || '',
+            os: vm.os || '',
+            os_version: vm.os_version || '',
+            cpu: vm.cpu || 0,
+            ram: vm.ram || 0,
+            disk: vm.disk || 0,
+            extra_disk: vm.extra_disk || 0,
+            ipv4: vm.ipv4 || '',
+            ipv6: vm.ipv6 || '',
+            backup: vm.backup || '',
+            contact_person: vm.contact_person || '',
+            description: vm.description || '',
+            in_use: vm.in_use || 0,
+            is_important: vm.is_important || 0,
+            used_by_us: vm.used_by_us || 0,
+            ansible: vm.ansible || 0,
+            docker: vm.docker || 0,
+            monitored: vm.monitored || 0,
+            vpn: vm.vpn || 0,
+            os_upgrade: vm.os_upgrade || 0,
+            app_upgrade: vm.app_upgrade || 0
+        };
+
+        return fetch(`/api/vms/${vmId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(async res => {
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || 'Σφάλμα κατά την ενημέρωση');
+            
+            // Merge response back into vm object to guarantee alignment with DB
+            Object.assign(vm, data);
+            renderUpgradesTab();
+            renderDashboard();
+            showToast('Η κατάσταση αναβάθμισης ενημερώθηκε', 'success');
+            fetchStats();
+        })
+        .catch(err => {
+            // Revert in-memory state on error
+            vm[field] = oldVal;
+            renderUpgradesTab();
+            renderDashboard();
+            showToast(err.message, 'error');
+        });
+    });
 }
 
 // -------------------------------------------------------------

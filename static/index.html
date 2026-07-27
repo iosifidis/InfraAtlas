@@ -88,6 +88,10 @@
                     <i data-lucide="globe"></i>
                     <span>DNS Records</span>
                 </a>
+                <a href="#upgrades" class="menu-item" data-tab="upgrades">
+                    <i data-lucide="arrow-up-circle"></i>
+                    <span>Αναβαθμίσεις</span>
+                </a>
                 <a href="#reports" class="menu-item" data-tab="reports">
                     <i data-lucide="file-bar-chart"></i>
                     <span>Αναφορές & Έλεγχος</span>
@@ -406,6 +410,39 @@
                                 </thead>
                                 <tbody id="dns-tbody">
                                     <!-- Dynamic DNS rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- UPGRADES TAB -->
+                <section id="tab-upgrades" class="tab-pane">
+                    <div class="card glass">
+                        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+                            <div>
+                                <h3>Λίστα Ενεργών Αναβαθμίσεων</h3>
+                                <p class="text-secondary" style="margin-top: 0.25rem;">Διαχείριση και αλλαγή κατάστασης αναβαθμίσεων OS & Λογισμικού</p>
+                            </div>
+                            <div id="upgrades-summary-badge" class="badge badge-info" style="font-size: 0.875rem; padding: 0.5rem 1rem;">
+                                0 VMs προς αναβάθμιση
+                            </div>
+                        </div>
+
+                        <div class="table-responsive" style="margin-top: 1rem;">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>VM / Domain</th>
+                                        <th>Cluster</th>
+                                        <th>Specs (CPU/RAM/Disk)</th>
+                                        <th>IPv4</th>
+                                        <th style="text-align: center;">Αναβάθμιση OS</th>
+                                        <th style="text-align: center;">Αναβάθμιση Software</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="upgrades-tbody">
+                                    <!-- Dynamic upgrades rows -->
                                 </tbody>
                             </table>
                         </div>
