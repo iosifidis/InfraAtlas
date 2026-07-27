@@ -822,15 +822,15 @@ function renderUpgradesTab() {
             <td class="col-cluster"><span class="badge badge-info">${escapeHTML(v.cluster_name)}</span></td>
             <td class="col-specs"><span style="font-size:0.8125rem;">${specsText}</span></td>
             <td class="col-ipv4"><code style="font-size: 0.8125rem;">${escapeHTML(v.ipv4 || '-')}</code></td>
-            <td style="text-align: center;">
-                <label class="switch switch-small" title="Αναβάθμιση Λειτουργικού (OS)">
-                    <input type="checkbox" ${v.os_upgrade === 1 ? 'checked' : ''} onchange="toggleVMUpgrade(${v.id}, 'os_upgrade', this.checked)">
+            <td style="text-align: center;" onclick="event.stopPropagation();">
+                <label class="switch switch-small" title="Αναβάθμιση Λειτουργικού (OS)" onclick="event.stopPropagation();">
+                    <input type="checkbox" ${Number(v.os_upgrade) === 1 ? 'checked' : ''} onchange="toggleVMUpgrade(${v.id}, 'os_upgrade', this.checked)">
                     <span class="slider"></span>
                 </label>
             </td>
-            <td style="text-align: center;">
-                <label class="switch switch-small" title="Αναβάθμιση Λογισμικού (Software)">
-                    <input type="checkbox" ${v.app_upgrade === 1 ? 'checked' : ''} onchange="toggleVMUpgrade(${v.id}, 'app_upgrade', this.checked)">
+            <td style="text-align: center;" onclick="event.stopPropagation();">
+                <label class="switch switch-small" title="Αναβάθμιση Λογισμικού (Software)" onclick="event.stopPropagation();">
+                    <input type="checkbox" ${Number(v.app_upgrade) === 1 ? 'checked' : ''} onchange="toggleVMUpgrade(${v.id}, 'app_upgrade', this.checked)">
                     <span class="slider"></span>
                 </label>
             </td>
@@ -841,27 +841,13 @@ function renderUpgradesTab() {
     lucide.createIcons({ nodes: [tbody] });
 }
 
-const vmUpgradePending = {};
-
 function toggleVMUpgrade(vmId, field, isChecked) {
     const vm = (state.vms || []).find(v => v.id === vmId);
     if (!vm) return;
 
-    const oldVal = vm[field] || 0;
     const newVal = isChecked ? 1 : 0;
-
-    // 1. Immediately update in-memory state so UI updates instantly
-    vm[field] = newVal;
-
-    // 2. Instantly re-render Upgrades Tab & Dashboard
-    renderUpgradesTab();
-    renderDashboard();
-
-    // 3. Send PATCH endpoint immediately (no debounce delay) so DB is updated instantly
-    const patch = {
-        os_upgrade: Number(vm.os_upgrade) || 0,
-        app_upgrade: Number(vm.app_upgrade) || 0
-    };
+    const patch = {};
+    patch[field] = newVal;
 
     fetch(`/api/vms/${vmId}`, {
         method: 'PATCH',
@@ -871,19 +857,19 @@ function toggleVMUpgrade(vmId, field, isChecked) {
     .then(async res => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Σφάλμα κατά την ενημέρωση');
-        // Merge confirmed DB state back into vm
-        Object.assign(vm, { os_upgrade: data.os_upgrade, app_upgrade: data.app_upgrade });
+        
+        vm.os_upgrade = Number(data.os_upgrade);
+        vm.app_upgrade = Number(data.app_upgrade);
+
         renderUpgradesTab();
         renderDashboard();
-        showToast('Η κατάσταση αναβάθμισης ενημερώθηκε', 'success');
+        if (typeof renderVMs === 'function') renderVMs();
+        showToast('Η κατάσταση αναβάθμισης ενημερώθηκε επιτυχώς', 'success');
         fetchStats();
     })
     .catch(err => {
-        // Revert in-memory state on error
-        vm[field] = oldVal;
         renderUpgradesTab();
-        renderDashboard();
-        showToast(err.message, 'error');
+        showToast(err.message || 'Αποτυχία ενημέρωσης στη βάση', 'error');
     });
 }
 
