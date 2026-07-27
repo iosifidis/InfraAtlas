@@ -704,7 +704,7 @@ function renderVMs() {
         // Badges elements
         let badgesHtml = '';
         if (v.is_important === 1) badgesHtml += '<span class="badge badge-danger" style="margin-left:4px;">Important</span>';
-        if (v.monitored === 1) badgesHtml += '<span class="badge badge-info" style="margin-left:4px;">Monitored</span>';
+        if (v.monitored === 1) badgesHtml += '<span class="badge badge-success" style="margin-left:4px;">Monitored</span>';
         if (v.os_upgrade === 1) badgesHtml += '<span class="badge badge-warning" style="margin-left:4px;" title="Αναβάθμιση Λειτουργικού">OS Upgr</span>';
         if (v.app_upgrade === 1) badgesHtml += '<span class="badge badge-primary" style="margin-left:4px;" title="Αναβάθμιση Λογισμικού">App Upgr</span>';
         if (v.ansible === 1) badgesHtml += '<span class="badge badge-info" style="margin-left:4px;" title="Ansible">Ansible</span>';
@@ -1793,16 +1793,16 @@ function renderReportTable(vms) {
             <td><code>${escapeHTML(v.ipv4 || '-')}</code></td>
             <td>
                 <div style="font-size: 0.75rem;">
-                    <div>VPN: ${v.vpn === 1 ? 'Ναι' : 'Όχι'}</div>
-                    <div>Backup: ${escapeHTML(v.backup || 'Όχι')}</div>
+                    <div>VPN: <span class="badge ${v.vpn === 1 ? 'badge-success' : 'badge-danger'}">${v.vpn === 1 ? 'Ναι' : 'Όχι'}</span></div>
+                    <div>Backup: ${v.backup ? `<span class="badge badge-success">${escapeHTML(v.backup)}</span>` : '<span class="badge badge-danger">Όχι</span>'}</div>
                 </div>
             </td>
             <td><span class="badge ${v.in_use === 1 ? 'badge-success' : 'badge-danger'}">${v.in_use === 1 ? 'Ναι' : 'Όχι'}</span></td>
-            <td><span class="badge ${v.is_important === 1 ? 'badge-danger' : 'badge-info'}">${v.is_important === 1 ? 'Ναι' : 'Όχι'}</span></td>
+            <td><span class="badge ${v.is_important === 1 ? 'badge-danger' : 'badge-danger'}">${v.is_important === 1 ? 'Ναι' : 'Όχι'}</span></td>
             <td>
                 <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                    <span class="badge ${v.docker === 1 ? 'badge-primary' : 'badge-secondary'}" style="${v.docker === 0 ? 'opacity:0.6;' : ''}">Docker: ${v.docker === 1 ? 'Ναι' : 'Όχι'}</span>
-                    <span class="badge ${v.ansible === 1 ? 'badge-info' : 'badge-secondary'}" style="${v.ansible === 0 ? 'opacity:0.6;' : ''}">Ansible: ${v.ansible === 1 ? 'Ναι' : 'Όχι'}</span>
+                    <span class="badge ${v.docker === 1 ? 'badge-success' : 'badge-danger'}">Docker: ${v.docker === 1 ? 'Ναι' : 'Όχι'}</span>
+                    <span class="badge ${v.ansible === 1 ? 'badge-success' : 'badge-danger'}">Ansible: ${v.ansible === 1 ? 'Ναι' : 'Όχι'}</span>
                 </div>
             </td>
         `;
