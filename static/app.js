@@ -332,9 +332,9 @@ function fetchVMs() {
         .then(data => {
             state.vms = data || [];
             state.vmsLoaded = true;
-            renderVMs();
-            renderDashboard();
-            renderUpgradesTab();
+            try { renderVMs(); } catch (e) { console.error("Error in renderVMs:", e); }
+            try { renderDashboard(); } catch (e) { console.error("Error in renderDashboard:", e); }
+            try { renderUpgradesTab(); } catch (e) { console.error("Error in renderUpgradesTab:", e); }
         })
         .catch(err => console.error("Error loading VMs:", err));
 }
@@ -769,10 +769,10 @@ function renderUpgradesTab() {
 
     tbody.innerHTML = '';
 
-    const needingUpgrade = (state.vms || []).filter(v => v.os_upgrade === 1 || v.app_upgrade === 1);
+    const needingUpgrade = (state.vms || []).filter(v => Number(v.os_upgrade) === 1 || Number(v.app_upgrade) === 1);
     
     // Sort: Priority (is_important === 1) first, then alphabetical by name (Same as Dashboard!)
-    needingUpgrade.sort((a, b) => (b.is_important || 0) - (a.is_important || 0) || a.name.localeCompare(b.name));
+    needingUpgrade.sort((a, b) => (Number(b.is_important) || 0) - (Number(a.is_important) || 0) || (a.name || '').localeCompare(b.name || ''));
 
     if (summaryBadge) {
         summaryBadge.textContent = `${needingUpgrade.length} VMs προς αναβάθμιση`;
@@ -857,38 +857,34 @@ function toggleVMUpgrade(vmId, field, isChecked) {
     renderUpgradesTab();
     renderDashboard();
 
-    // 3. Use PATCH endpoint — only sends os_upgrade + app_upgrade (no race with full PUT)
-    //    Debounce: cancel any pending save for this VM, send latest state after 200ms
-    clearTimeout(vmUpgradePending[vmId]);
-    vmUpgradePending[vmId] = setTimeout(() => {
-        const patch = {
-            os_upgrade: vm.os_upgrade || 0,
-            app_upgrade: vm.app_upgrade || 0
-        };
+    // 3. Send PATCH endpoint immediately (no debounce delay) so DB is updated instantly
+    const patch = {
+        os_upgrade: Number(vm.os_upgrade) || 0,
+        app_upgrade: Number(vm.app_upgrade) || 0
+    };
 
-        fetch(`/api/vms/${vmId}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(patch)
-        })
-        .then(async res => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Σφάλμα κατά την ενημέρωση');
-            // Merge confirmed DB state back into vm
-            Object.assign(vm, { os_upgrade: data.os_upgrade, app_upgrade: data.app_upgrade });
-            renderUpgradesTab();
-            renderDashboard();
-            showToast('Η κατάσταση αναβάθμισης ενημερώθηκε', 'success');
-            fetchStats();
-        })
-        .catch(err => {
-            // Revert in-memory state on error
-            vm[field] = oldVal;
-            renderUpgradesTab();
-            renderDashboard();
-            showToast(err.message, 'error');
-        });
-    }, 200);
+    fetch(`/api/vms/${vmId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+    })
+    .then(async res => {
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Σφάλμα κατά την ενημέρωση');
+        // Merge confirmed DB state back into vm
+        Object.assign(vm, { os_upgrade: data.os_upgrade, app_upgrade: data.app_upgrade });
+        renderUpgradesTab();
+        renderDashboard();
+        showToast('Η κατάσταση αναβάθμισης ενημερώθηκε', 'success');
+        fetchStats();
+    })
+    .catch(err => {
+        // Revert in-memory state on error
+        vm[field] = oldVal;
+        renderUpgradesTab();
+        renderDashboard();
+        showToast(err.message, 'error');
+    });
 }
 
 // -------------------------------------------------------------
