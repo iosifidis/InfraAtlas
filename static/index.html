@@ -280,7 +280,7 @@
 
                             <div class="filter-dropdown">
                                 <label for="filter-cluster">Cluster</label>
-                                <select id="filter-cluster" onchange="fetchVMs()">
+                                <select id="filter-cluster" onchange="renderVMs()">
                                     <option value="">Όλα</option>
                                     <!-- Dynamic options -->
                                 </select>
@@ -288,7 +288,7 @@
 
                             <div class="filter-dropdown">
                                 <label for="filter-in-use">Χρήση</label>
-                                <select id="filter-in-use" onchange="fetchVMs()">
+                                <select id="filter-in-use" onchange="renderVMs()">
                                     <option value="">Όλα</option>
                                     <option value="1">Σε χρήση</option>
                                     <option value="0">Όχι σε χρήση</option>
@@ -297,7 +297,7 @@
 
                             <div class="filter-dropdown">
                                 <label for="filter-important">Σημαντικότητα</label>
-                                <select id="filter-important" onchange="fetchVMs()">
+                                <select id="filter-important" onchange="renderVMs()">
                                     <option value="">Όλα</option>
                                     <option value="1">Σημαντικά</option>
                                     <option value="0">Μη Σημαντικά</option>
@@ -306,7 +306,7 @@
 
                             <div class="filter-dropdown">
                                 <label for="filter-monitored">Monitored</label>
-                                <select id="filter-monitored" onchange="fetchVMs()">
+                                <select id="filter-monitored" onchange="renderVMs()">
                                     <option value="">Όλα</option>
                                     <option value="1">Ναι</option>
                                     <option value="0">Όχι</option>
@@ -804,7 +804,7 @@
                 <button type="button" class="modal-tab-btn" data-modaltab="vm-tab-network">Δίκτυο & Συντήρηση</button>
             </div>
 
-            <form id="vm-form" onsubmit="saveVM(event)">
+            <form id="vm-form" novalidate onsubmit="saveVM(event)">
                 <input type="hidden" id="vm-id">
 
                 <!-- TAB 1: Basic Info -->
@@ -826,7 +826,7 @@
                         </div>
                         <div class="form-group" data-customfield="url">
                             <label for="vm-url">URL Διαχείρισης</label>
-                            <input type="url" id="vm-url" placeholder="https://proxmox:8006">
+                            <input type="text" id="vm-url" placeholder="π.χ. https://proxmox:8006 ή domain.gr">
                         </div>
                         <div class="form-group" data-customfield="os">
                             <label for="vm-os">Λειτουργικό Σύστημα (OS)</label>

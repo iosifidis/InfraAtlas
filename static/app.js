@@ -218,10 +218,10 @@ function setupEventListeners() {
         else if (id === 'delete-modal')     closeDeleteModal();
     });
 
-    // Debounced search inputs (300ms delay)
-    const debouncedFetchVMs  = debounce(fetchVMs,  300);
+    // Search inputs
+    const debouncedRenderVMs = debounce(renderVMs, 150);
     const debouncedFetchDNS  = debounce(fetchDNSRecords, 300);
-    document.getElementById('vm-search').addEventListener('input',  debouncedFetchVMs);
+    document.getElementById('vm-search').addEventListener('input',  debouncedRenderVMs);
     document.getElementById('dns-search').addEventListener('input', debouncedFetchDNS);
 }
 
@@ -319,26 +319,12 @@ function fetchClusters() {
 }
 
 function fetchVMs() {
-    const search = document.getElementById('vm-search').value.trim();
-    const clusterId = document.getElementById('filter-cluster').value;
-    const inUse = document.getElementById('filter-in-use').value;
-    const important = document.getElementById('filter-important').value;
-    const monitored = document.getElementById('filter-monitored').value;
-
-    let queryParams = [];
-    if (search) queryParams.push(`search=${encodeURIComponent(search)}`);
-    if (clusterId) queryParams.push(`cluster_id=${clusterId}`);
-    if (inUse !== '') queryParams.push(`in_use=${inUse}`);
-    if (important !== '') queryParams.push(`is_important=${important}`);
-    if (monitored !== '') queryParams.push(`monitored=${monitored}`);
-
-    const url = '/api/vms' + (queryParams.length ? '?' + queryParams.join('&') : '');
-
-    fetch(url)
+    return fetch('/api/vms')
         .then(res => res.json())
         .then(data => {
             state.vms = data || [];
             renderVMs();
+            renderDashboard();
         })
         .catch(err => console.error("Error loading VMs:", err));
 }
@@ -509,7 +495,9 @@ function renderStatsDashboard() {
     const upgradesBadge = document.getElementById('upgrades-count-badge');
     if (upgradesListContainer) {
         upgradesListContainer.innerHTML = '';
-        const needingUpgrade = (state.vms || []).filter(v => v.os_upgrade === 1 || v.app_upgrade === 1);
+        const needingUpgrade = (state.vms || [])
+            .filter(v => v.os_upgrade === 1 || v.app_upgrade === 1)
+            .sort((a, b) => (b.is_important || 0) - (a.is_important || 0) || a.name.localeCompare(b.name));
         if (upgradesBadge) {
             upgradesBadge.textContent = needingUpgrade.length;
         }
@@ -525,10 +513,14 @@ function renderStatsDashboard() {
             needingUpgrade.forEach(v => {
                 const card = document.createElement('div');
                 card.className = 'upgrade-item-card';
+                if (v.is_important === 1) {
+                    card.classList.add('important-upgrade-card');
+                }
                 card.style.cursor = 'pointer';
                 card.onclick = () => openVMModal(v.id);
 
                 let badgesHtml = '';
+                if (v.is_important === 1) badgesHtml += '<span class="badge badge-danger" style="margin-left:4px;">Important</span>';
                 if (v.os_upgrade === 1) badgesHtml += '<span class="badge badge-warning" style="margin-left:4px;" title="Αναβάθμιση Λειτουργικού">OS Upgr</span>';
                 if (v.app_upgrade === 1) badgesHtml += '<span class="badge badge-primary" style="margin-left:4px;" title="Αναβάθμιση Λογισμικού">App Upgr</span>';
 
@@ -644,14 +636,53 @@ function populateClusterDropdowns() {
 
 function renderVMs() {
     const tbody = document.getElementById('vms-tbody');
+    if (!tbody) return;
     tbody.innerHTML = '';
 
-    if (state.vms.length === 0) {
+    const searchInput = document.getElementById('vm-search');
+    const clusterSelect = document.getElementById('filter-cluster');
+    const inUseSelect = document.getElementById('filter-in-use');
+    const importantSelect = document.getElementById('filter-important');
+    const monitoredSelect = document.getElementById('filter-monitored');
+
+    const search = (searchInput ? searchInput.value : '').trim().toLowerCase();
+    const clusterId = clusterSelect ? clusterSelect.value : '';
+    const inUse = inUseSelect ? inUseSelect.value : '';
+    const important = importantSelect ? importantSelect.value : '';
+    const monitored = monitoredSelect ? monitoredSelect.value : '';
+
+    let filtered = state.vms || [];
+
+    if (search) {
+        filtered = filtered.filter(v => 
+            (v.name && v.name.toLowerCase().includes(search)) ||
+            (v.ipv4 && v.ipv4.toLowerCase().includes(search)) ||
+            (v.ipv6 && v.ipv6.toLowerCase().includes(search)) ||
+            (v.url && v.url.toLowerCase().includes(search)) ||
+            (v.os && v.os.toLowerCase().includes(search)) ||
+            (v.contact_person && v.contact_person.toLowerCase().includes(search)) ||
+            (v.description && v.description.toLowerCase().includes(search))
+        );
+    }
+    if (clusterId) {
+        filtered = filtered.filter(v => v.cluster_id === parseInt(clusterId));
+    }
+    if (inUse !== '') {
+        filtered = filtered.filter(v => v.in_use === parseInt(inUse));
+    }
+    if (important !== '') {
+        filtered = filtered.filter(v => v.is_important === parseInt(important));
+    }
+    if (monitored !== '') {
+        filtered = filtered.filter(v => v.monitored === parseInt(monitored));
+    }
+
+    if (filtered.length === 0) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-secondary" style="text-align: center; padding: 2rem;">Δεν βρέθηκαν VMs με τα τρέχοντα κριτήρια.</td></tr>`;
         return;
     }
 
-    state.vms.forEach(v => {
+    filtered.forEach(v => {
         const row = document.createElement('tr');
         row.classList.add('vm-table-row', 'clickable-row');
         row.setAttribute('title', 'Κάντε κλικ για προβολή / επεξεργασία VM');
@@ -854,9 +885,35 @@ function closeVMModal() {
 }
 
 function saveVM(e) {
-    e.preventDefault();
+    if (e) e.preventDefault();
     const id = document.getElementById('vm-id').value;
     
+    const clusterIdVal = document.getElementById('vm-cluster-id').value;
+    const nameVal = document.getElementById('vm-name').value.trim();
+
+    const switchModalTab = (tabId) => {
+        document.querySelectorAll('.modal-tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
+        const tabBtn = document.querySelector(`[data-modaltab="${tabId}"]`);
+        const tabContent = document.getElementById(tabId);
+        if (tabBtn) tabBtn.classList.add('active');
+        if (tabContent) tabContent.classList.add('active');
+    };
+
+    if (!clusterIdVal) {
+        switchModalTab('vm-tab-basic');
+        showToast('Παρακαλώ επιλέξτε Cluster', 'error');
+        document.getElementById('vm-cluster-id').focus();
+        return;
+    }
+
+    if (!nameVal) {
+        switchModalTab('vm-tab-basic');
+        showToast('Παρακαλώ συμπληρώστε το Όνομα VM', 'error');
+        document.getElementById('vm-name').focus();
+        return;
+    }
+
     // Numeric specs validation & parsing
     const parseNumber = (val) => {
         const num = parseFloat(val);
@@ -864,8 +921,8 @@ function saveVM(e) {
     };
 
     const payload = {
-        cluster_id: parseInt(document.getElementById('vm-cluster-id').value),
-        name: document.getElementById('vm-name').value.trim(),
+        cluster_id: parseInt(clusterIdVal),
+        name: nameVal,
         default_password: document.getElementById('vm-default-password').value.trim(),
         url: document.getElementById('vm-url').value.trim(),
         os: document.getElementById('vm-os').value.trim(),
@@ -907,6 +964,7 @@ function saveVM(e) {
     })
     .then(() => {
         closeVMModal();
+        showToast('Το VM αποθηκεύτηκε επιτυχώς', 'success');
         fetchVMs();
         fetchStats();
     })
