@@ -572,6 +572,37 @@ func handleVMDetail(w http.ResponseWriter, r *http.Request) {
 		}
 		respondWithJSON(w, http.StatusOK, v)
 
+	case http.MethodPatch:
+		var patch struct {
+			OSUpgrade  *int `json:"os_upgrade"`
+			AppUpgrade *int `json:"app_upgrade"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&patch); err != nil {
+			respondWithError(w, http.StatusBadRequest, "Invalid request body")
+			return
+		}
+		// Fetch current values to preserve any field not provided
+		current, err := GetVM(id)
+		if err != nil {
+			respondWithError(w, http.StatusNotFound, "VM not found")
+			return
+		}
+		osUpgrade := current.OSUpgrade
+		appUpgrade := current.AppUpgrade
+		if patch.OSUpgrade != nil {
+			osUpgrade = *patch.OSUpgrade
+		}
+		if patch.AppUpgrade != nil {
+			appUpgrade = *patch.AppUpgrade
+		}
+		if err := PatchVMUpgradeFlags(id, osUpgrade, appUpgrade); err != nil {
+			respondWithError(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		current.OSUpgrade = osUpgrade
+		current.AppUpgrade = appUpgrade
+		respondWithJSON(w, http.StatusOK, current)
+
 	case http.MethodDelete:
 		if err := DeleteVM(id); err != nil {
 			respondWithError(w, http.StatusInternalServerError, err.Error())

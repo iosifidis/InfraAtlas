@@ -275,7 +275,8 @@ function switchTab(tabId) {
         case 'upgrades':
             pageTitle.textContent = 'Αναβαθμίσεις';
             pageDesc.textContent = 'Λίστα εικονικών μηχανών που απαιτούν αναβάθμιση λειτουργικού ή λογισμικού.';
-            renderUpgradesTab();
+            // Always fetch fresh data when navigating to upgrades
+            fetchVMs();
             break;
         case 'reports':
             pageTitle.textContent = 'Αναφορές & Έλεγχος';
@@ -754,7 +755,8 @@ function renderUpgradesTab() {
     const summaryBadge = document.getElementById('upgrades-summary-badge');
     if (!tbody) return;
 
-    if (!state.vmsLoaded) {
+    // Show spinner if vms not yet loaded (null = initial state, [] = loaded but empty)
+    if (state.vms === null) {
         tbody.innerHTML = `<tr><td colspan="6" class="text-secondary" style="text-align: center; padding: 2.5rem;"><i data-lucide="loader-2" class="spin" style="margin-right: 0.5rem;"></i> Φόρτωση δεδομένων...</td></tr>`;
         if (summaryBadge) {
             summaryBadge.className = 'badge badge-info';
@@ -838,7 +840,7 @@ function renderUpgradesTab() {
     lucide.createIcons({ nodes: [tbody] });
 }
 
-const vmUpdatePromises = {};
+const vmUpgradePending = {};
 
 function toggleVMUpgrade(vmId, field, isChecked) {
     const vm = (state.vms || []).find(v => v.id === vmId);
@@ -849,53 +851,30 @@ function toggleVMUpgrade(vmId, field, isChecked) {
 
     // 1. Immediately update in-memory state so UI updates instantly
     vm[field] = newVal;
-    
+
     // 2. Instantly re-render Upgrades Tab & Dashboard
     renderUpgradesTab();
     renderDashboard();
 
-    // 3. Queue network requests per VM ID to prevent out-of-order race conditions
-    const previousPromise = vmUpdatePromises[vmId] || Promise.resolve();
-
-    vmUpdatePromises[vmId] = previousPromise.then(() => {
-        const payload = {
-            cluster_id: vm.cluster_id,
-            name: vm.name,
-            default_password: vm.default_password || '',
-            url: vm.url || '',
-            os: vm.os || '',
-            os_version: vm.os_version || '',
-            cpu: vm.cpu || 0,
-            ram: vm.ram || 0,
-            disk: vm.disk || 0,
-            extra_disk: vm.extra_disk || 0,
-            ipv4: vm.ipv4 || '',
-            ipv6: vm.ipv6 || '',
-            backup: vm.backup || '',
-            contact_person: vm.contact_person || '',
-            description: vm.description || '',
-            in_use: vm.in_use || 0,
-            is_important: vm.is_important || 0,
-            used_by_us: vm.used_by_us || 0,
-            ansible: vm.ansible || 0,
-            docker: vm.docker || 0,
-            monitored: vm.monitored || 0,
-            vpn: vm.vpn || 0,
+    // 3. Use PATCH endpoint — only sends os_upgrade + app_upgrade (no race with full PUT)
+    //    Debounce: cancel any pending save for this VM, send latest state after 200ms
+    clearTimeout(vmUpgradePending[vmId]);
+    vmUpgradePending[vmId] = setTimeout(() => {
+        const patch = {
             os_upgrade: vm.os_upgrade || 0,
             app_upgrade: vm.app_upgrade || 0
         };
 
-        return fetch(`/api/vms/${vmId}`, {
-            method: 'PUT',
+        fetch(`/api/vms/${vmId}`, {
+            method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(patch)
         })
         .then(async res => {
             const data = await res.json();
             if (!res.ok) throw new Error(data.error || 'Σφάλμα κατά την ενημέρωση');
-            
-            // Merge response back into vm object to guarantee alignment with DB
-            Object.assign(vm, data);
+            // Merge confirmed DB state back into vm
+            Object.assign(vm, { os_upgrade: data.os_upgrade, app_upgrade: data.app_upgrade });
             renderUpgradesTab();
             renderDashboard();
             showToast('Η κατάσταση αναβάθμισης ενημερώθηκε', 'success');
@@ -908,7 +887,7 @@ function toggleVMUpgrade(vmId, field, isChecked) {
             renderDashboard();
             showToast(err.message, 'error');
         });
-    });
+    }, 200);
 }
 
 // -------------------------------------------------------------

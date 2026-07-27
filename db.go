@@ -456,6 +456,12 @@ func UpsertVMByName(v *VM) (created bool, err error) {
 	return true, err
 }
 
+func PatchVMUpgradeFlags(id int64, osUpgrade int, appUpgrade int) error {
+	query := `UPDATE vms SET os_upgrade = ?, app_upgrade = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+	_, err := DB.Exec(query, osUpgrade, appUpgrade, id)
+	return err
+}
+
 func DeleteVM(id int64) error {
 	query := `DELETE FROM vms WHERE id = ?`
 	_, err := DB.Exec(query, id)

@@ -72,6 +72,7 @@ func main() {
 	apiMux.HandleFunc("POST /api/vms/import", importVMsHandler)
 	apiMux.HandleFunc("GET /api/vms/{id}", handleVMDetail)
 	apiMux.HandleFunc("PUT /api/vms/{id}", handleVMDetail)
+	apiMux.HandleFunc("PATCH /api/vms/{id}", handleVMDetail)
 	apiMux.HandleFunc("DELETE /api/vms/{id}", handleVMDetail)
 
 	// Stats, Settings and Export APIs
