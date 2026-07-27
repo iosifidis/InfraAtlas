@@ -327,7 +327,7 @@ function fetchClusters() {
 }
 
 function fetchVMs() {
-    return fetch('/api/vms')
+    return fetch('/api/vms?t=' + Date.now())
         .then(res => res.json())
         .then(data => {
             state.vms = data || [];

@@ -93,11 +93,10 @@ func InitDB(dbPath string) error {
 }
 
 func migrate() error {
-	// Enable foreign keys
-	_, err := DB.Exec("PRAGMA foreign_keys = ON;")
-	if err != nil {
-		return err
-	}
+	// Enable foreign keys, WAL mode, and busy timeout for concurrent safety
+	_, _ = DB.Exec("PRAGMA foreign_keys = ON;")
+	_, _ = DB.Exec("PRAGMA journal_mode = WAL;")
+	_, _ = DB.Exec("PRAGMA busy_timeout = 5000;")
 
 	schema := []string{
 		`CREATE TABLE IF NOT EXISTS clusters (
