@@ -333,7 +333,7 @@ function fetchVMs() {
             state.vms = data || [];
             state.vmsLoaded = true;
             try { renderVMs(); } catch (e) { console.error("Error in renderVMs:", e); }
-            try { renderDashboard(); } catch (e) { console.error("Error in renderDashboard:", e); }
+            try { renderStatsDashboard(); } catch (e) { console.error("Error in renderStatsDashboard:", e); }
             try { renderUpgradesTab(); } catch (e) { console.error("Error in renderUpgradesTab:", e); }
         })
         .catch(err => console.error("Error loading VMs:", err));
@@ -862,7 +862,7 @@ function toggleVMUpgrade(vmId, field, isChecked) {
         vm.app_upgrade = Number(data.app_upgrade);
 
         renderUpgradesTab();
-        renderDashboard();
+        if (typeof renderStatsDashboard === 'function') renderStatsDashboard();
         if (typeof renderVMs === 'function') renderVMs();
         showToast('Η κατάσταση αναβάθμισης ενημερώθηκε επιτυχώς', 'success');
         fetchStats();
