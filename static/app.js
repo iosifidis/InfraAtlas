@@ -275,7 +275,8 @@ function switchTab(tabId) {
         case 'upgrades':
             pageTitle.textContent = 'Αναβαθμίσεις';
             pageDesc.textContent = 'Λίστα εικονικών μηχανών που απαιτούν αναβάθμιση λειτουργικού ή λογισμικού.';
-            // Always fetch fresh data when navigating to upgrades
+            // Render immediately with current data (if loaded), then refresh in background
+            renderUpgradesTab();
             fetchVMs();
             break;
         case 'reports':
