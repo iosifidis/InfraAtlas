@@ -560,11 +560,11 @@ function renderStatsDashboard() {
             row.innerHTML = `
                 <td><strong>${escapeHTML(dist.name)}</strong></td>
                 <td>${dist.vm_count}</td>
-                <td><span class="badge badge-success">${dist.in_use_count} Active</span></td>
+                <td>${dist.in_use_count}</td>
                 <td>${(dist.cpu || 0).toFixed(1)}</td>
                 <td>${(dist.ram || 0).toFixed(1)}</td>
                 <td>${(dist.disk || 0).toFixed(1)}</td>
-                <td>${dist.internal_count} VMs</td>
+                <td>${dist.important_count || 0}</td>
             `;
             tbody.appendChild(row);
         });

@@ -653,15 +653,15 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 	clusterStats := make(map[int64]map[string]interface{})
 	for _, c := range clusters {
 		clusterStats[c.ID] = map[string]interface{}{
-			"id":             c.ID,
-			"name":           c.Name,
-			"cpu":            0.0,
-			"ram":            0.0,
-			"disk":           0.0,
-			"extra_disk":     0.0,
-			"vm_count":       0,
-			"in_use_count":   0,
-			"internal_count": 0,
+			"id":              c.ID,
+			"name":            c.Name,
+			"cpu":             0.0,
+			"ram":             0.0,
+			"disk":            0.0,
+			"extra_disk":      0.0,
+			"vm_count":        0,
+			"in_use_count":    0,
+			"important_count": 0,
 		}
 	}
 
@@ -696,6 +696,9 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 			stat["vm_count"] = stat["vm_count"].(int) + 1
 			if v.InUse == 1 {
 				stat["in_use_count"] = stat["in_use_count"].(int) + 1
+			}
+			if v.IsImportant == 1 {
+				stat["important_count"] = stat["important_count"].(int) + 1
 			}
 		}
 	}
