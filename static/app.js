@@ -816,6 +816,24 @@ function renderUpgradesTab() {
                         <div class="vm-url-sub">
                             ${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}
                         </div>
+                        <div class="mobile-only-sub" style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
+                            ${escapeHTML(v.cluster_name)} ${v.ipv4 ? ' | <code>' + escapeHTML(v.ipv4) + '</code>' : ''}
+                        </div>
+                        <div class="upgrades-mobile-toggles" style="margin-top:6px; display:flex; align-items:center; gap:0.75rem;">
+                            <label class="switch switch-small" title="Αναβάθμιση OS" onclick="event.stopPropagation();">
+                                <span style="font-size:0.75rem; margin-right:4px; color:var(--text-secondary);">OS:</span>
+                                <input type="checkbox" ${Number(v.os_upgrade) === 1 ? 'checked' : ''} onchange="toggleVMUpgrade(${v.id}, 'os_upgrade', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                            <label class="switch switch-small" title="Αναβάθμιση App" onclick="event.stopPropagation();">
+                                <span style="font-size:0.75rem; margin-right:4px; color:var(--text-secondary);">App:</span>
+                                <input type="checkbox" ${Number(v.app_upgrade) === 1 ? 'checked' : ''} onchange="toggleVMUpgrade(${v.id}, 'app_upgrade', this.checked)">
+                                <span class="slider"></span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="mobile-chevron-icon">
+                        <i data-lucide="chevron-right"></i>
                     </div>
                 </div>
             </td>
@@ -1234,24 +1252,39 @@ function renderDNSRecords() {
     state.dnsRecords.forEach(r => {
         const row = document.createElement('tr');
         const badgeClass = r.type === 'A' ? 'badge-success' : 'badge-info';
-        
+
+        row.classList.add('dns-table-row', 'clickable-row');
+        row.setAttribute('title', 'Κάντε κλικ για επεξεργασία DNS');
+        row.onclick = (e) => {
+            if (e.target.closest('a') || e.target.closest('button')) return;
+            openDNSModal(r.id);
+        };
+
         row.innerHTML = `
-            <td>
-                <div style="font-weight: 600; color: #ffffff;">${escapeHTML(r.name)}</div>
-                ${r.description ? `<div style="font-size: 0.75rem; color: var(--text-secondary);">${escapeHTML(r.description)}</div>` : ''}
+            <td class="col-dns-info">
+                <div class="vm-row-flex">
+                    <div class="vm-main-details">
+                        <div class="vm-name-title">${escapeHTML(r.name)}</div>
+                        <div class="vm-url-sub"><code>${escapeHTML(r.value)}</code> &nbsp;<span class="badge ${badgeClass}" style="font-size:0.7rem;">${escapeHTML(r.type)}</span></div>
+                        ${r.description ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top:2px;">${escapeHTML(r.description)}</div>` : ''}
+                    </div>
+                    <div class="mobile-chevron-icon">
+                        <i data-lucide="chevron-right"></i>
+                    </div>
+                </div>
             </td>
             <td><span class="badge ${badgeClass}">${escapeHTML(r.type)}</span></td>
             <td><code>${escapeHTML(r.value)}</code></td>
             <td>
-                <button class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="linkDNSToVM('${escapeHTML(r.value)}', '${escapeHTML(r.name)}')">
+                <button class="btn btn-outline" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;" onclick="event.stopPropagation(); linkDNSToVM('${escapeHTML(r.value)}', '${escapeHTML(r.name)}')">
                     <i data-lucide="link" style="width:12px; height:12px;"></i>
                     <span>Σύνδεση / VM</span>
                 </button>
             </td>
             <td class="actions-col">
                 <div class="table-actions">
-                    <button class="btn-icon-only" onclick="openDNSModal(${r.id})" title="Επεξεργασία"><i data-lucide="edit-3"></i></button>
-                    <button class="btn-icon-only text-danger" onclick="openDeleteModal('dns', ${r.id})" title="Διαγραφή"><i data-lucide="trash-2"></i></button>
+                    <button class="btn-icon-only" onclick="event.stopPropagation(); openDNSModal(${r.id})" title="Επεξεργασία"><i data-lucide="edit-3"></i></button>
+                    <button class="btn-icon-only text-danger" onclick="event.stopPropagation(); openDeleteModal('dns', ${r.id})" title="Διαγραφή"><i data-lucide="trash-2"></i></button>
                 </div>
             </td>
         `;
@@ -1266,9 +1299,11 @@ function openDNSModal(id = null) {
     const modal = document.getElementById('dns-modal');
     const title = document.getElementById('dns-modal-title');
     const form = document.getElementById('dns-form');
+    const bannerContainer = document.getElementById('dns-linked-vm-banner');
     
     form.reset();
     document.getElementById('dns-id').value = '';
+    if (bannerContainer) bannerContainer.innerHTML = '';
 
     if (id) {
         title.textContent = 'Επεξεργασία Εγγραφής DNS';
@@ -1279,12 +1314,36 @@ function openDNSModal(id = null) {
             document.getElementById('dns-type').value = record.type;
             document.getElementById('dns-value').value = record.value;
             document.getElementById('dns-desc').value = record.description || '';
+
+            // Check if record is linked to a VM
+            const linkedVm = (state.vms || []).find(v => 
+                (v.ipv4 && v.ipv4 === record.value) || 
+                (v.ipv6 && v.ipv6 === record.value) ||
+                (v.url && normalizeHost(v.url) === normalizeHost(record.name)) ||
+                (v.url && normalizeHost(v.url) === normalizeHost(record.value))
+            );
+
+            if (linkedVm && bannerContainer) {
+                bannerContainer.innerHTML = `
+                    <div style="padding: 0.75rem 1rem; margin-bottom: 1rem; background: rgba(59, 130, 246, 0.12); border: 1px solid var(--primary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: space-between; gap: 0.5rem;">
+                        <div style="display: flex; align-items: center; gap: 0.5rem; font-size: 0.8125rem;">
+                            <i data-lucide="server" style="color: var(--primary); width:16px; height:16px; flex-shrink:0;"></i>
+                            <span>Συνδεδεμένο VM: <strong style="color:#ffffff;">${escapeHTML(linkedVm.name)}</strong> (${escapeHTML(linkedVm.ipv4 || '-')})</span>
+                        </div>
+                        <button type="button" class="btn btn-outline" style="padding: 0.25rem 0.6rem; font-size: 0.75rem; white-space:nowrap;" onclick="closeDNSModal(); openVMModal(${linkedVm.id});">
+                            <i data-lucide="external-link" style="width:12px; height:12px;"></i>
+                            <span>Καρτέλα VM</span>
+                        </button>
+                    </div>
+                `;
+            }
         }
     } else {
         title.textContent = 'Προσθήκη Εγγραφής DNS';
     }
 
     modal.classList.remove('hidden');
+    lucide.createIcons({ nodes: [modal] });
     openFocusTrap(modal.querySelector('.modal-box'), _trigger);
 }
 

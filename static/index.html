@@ -429,7 +429,8 @@
                             </div>
                         </div>
 
-                        <div class="table-responsive" style="margin-top: 1rem;">
+                        <div class="vms-table-wrapper glass" style="margin-top: 1rem;">
+                            <div class="table-container">
                             <table class="data-table">
                                 <thead>
                                     <tr>
@@ -445,6 +446,7 @@
                                     <!-- Dynamic upgrades rows -->
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
                 </section>
@@ -1002,6 +1004,7 @@
             </div>
             <form id="dns-form" onsubmit="saveDNSRecord(event)">
                 <input type="hidden" id="dns-id">
+                <div id="dns-linked-vm-banner"></div>
                 <div class="form-group">
                     <label for="dns-name">Domain / Hostname *</label>
                     <input type="text" id="dns-name" required placeholder="π.χ. web.ellak.gr">

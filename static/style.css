@@ -1087,7 +1087,7 @@ input:checked + .slider:before {
     position: relative;
     display: flex;
     align-items: center;
-    min-width: 280px;
+    min-width: 200px;
     flex-grow: 1;
 }
 
@@ -1327,6 +1327,11 @@ input:checked + .slider:before {
     display: none;
 }
 
+.upgrades-mobile-toggles,
+.mobile-only-sub {
+    display: none;
+}
+
 .clickable-row {
     cursor: pointer;
     transition: background-color 0.15s ease;
@@ -1503,6 +1508,72 @@ input:checked + .slider:before {
     .mobile-chevron-icon svg {
         width: 20px;
         height: 20px;
+    }
+
+    /* ---- DNS Table: card layout (mirrors VMs table) ---- */
+    /* thead: hide all columns except first */
+    .vms-table-wrapper:has(#dns-tbody) thead th:nth-child(n+2) {
+        display: none !important;
+    }
+
+    .vms-table-wrapper:has(#dns-tbody) thead th:first-child {
+        width: 100% !important;
+        display: block !important;
+        box-sizing: border-box;
+    }
+
+    /* tbody: collapse each row to a single tappable card */
+    #dns-tbody tr {
+        display: block !important;
+        border-bottom: 1px solid var(--border-color);
+        padding: 0.25rem 0;
+        cursor: pointer;
+    }
+
+    #dns-tbody tr td:nth-child(n+2) {
+        display: none !important;
+    }
+
+    #dns-tbody tr td:first-child {
+        width: 100% !important;
+        display: block !important;
+        padding: 0.75rem 1rem !important;
+        box-sizing: border-box;
+    }
+
+    /* ---- Upgrades Table: card layout (same as VMs — wrapper is now .vms-table-wrapper) ---- */
+    .upgrades-mobile-toggles {
+        display: flex !important;
+        align-items: center;
+        gap: 0.75rem;
+    }
+
+    .mobile-only-sub {
+        display: block !important;
+    }
+
+    /* ---- Report Actions ---- */
+    .report-options {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .report-actions {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .report-actions .btn {
+        flex: 1;
+        justify-content: center;
+    }
+
+    /* ---- Modal Tabs (horizontal scroll on narrow screens) ---- */
+    .modal-tabs {
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        gap: 1rem;
+        padding-bottom: 2px;
     }
 }
 
