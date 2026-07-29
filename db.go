@@ -157,6 +157,10 @@ func migrate() error {
 			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
 		);`,
 		`CREATE UNIQUE INDEX IF NOT EXISTS idx_dns_name_type ON dns_records(name, type);`,
+		`CREATE INDEX IF NOT EXISTS idx_vms_cluster_id ON vms(cluster_id);`,
+		`CREATE INDEX IF NOT EXISTS idx_vms_in_use ON vms(in_use);`,
+		`CREATE INDEX IF NOT EXISTS idx_vms_is_important ON vms(is_important);`,
+		`CREATE INDEX IF NOT EXISTS idx_vms_ipv4 ON vms(ipv4);`,
 	}
 
 	for _, q := range schema {

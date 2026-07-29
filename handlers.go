@@ -639,6 +639,8 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	dnsRecords, _ := GetDNSRecords("", "")
+
 	var totalCPU float64
 	var totalRAM float64
 	var totalDisk float64
@@ -646,9 +648,13 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 	var totalVMs int
 	var inUseVMs int
 	var importantVMs int
+	var usedByUsVMs int
 	var monitoredVMs int
 	var ansibleVMs int
 	var dockerVMs int
+	var vpnVMs int
+	var osUpgradeVMs int
+	var appUpgradeVMs int
 
 	clusterStats := make(map[int64]map[string]interface{})
 	for _, c := range clusters {
@@ -673,6 +679,9 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		if v.IsImportant == 1 {
 			importantVMs++
 		}
+		if v.UsedByUs == 1 {
+			usedByUsVMs++
+		}
 		if v.Monitored == 1 {
 			monitoredVMs++
 		}
@@ -681,6 +690,15 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		}
 		if v.Docker == 1 {
 			dockerVMs++
+		}
+		if v.VPN == 1 {
+			vpnVMs++
+		}
+		if v.OSUpgrade == 1 {
+			osUpgradeVMs++
+		}
+		if v.AppUpgrade == 1 {
+			appUpgradeVMs++
 		}
 
 		totalCPU += v.CPU
@@ -716,9 +734,14 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		"total_vms":            totalVMs,
 		"in_use_vms":           inUseVMs,
 		"important_vms":        importantVMs,
+		"used_by_us_vms":       usedByUsVMs,
 		"monitored_vms":        monitoredVMs,
 		"ansible_vms":          ansibleVMs,
 		"docker_vms":           dockerVMs,
+		"vpn_vms":              vpnVMs,
+		"os_upgrade_vms":       osUpgradeVMs,
+		"app_upgrade_vms":      appUpgradeVMs,
+		"total_dns_records":    len(dnsRecords),
 		"total_cpu":            totalCPU,
 		"total_ram":            totalRAM,
 		"total_disk":           totalDisk,
