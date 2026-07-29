@@ -20,10 +20,10 @@
 
 ```bash
 # Βασική εκκίνηση (port 8080, db στο ./data/)
-./vm-dashboard
+./InfraAtlas
 
 # Με custom port και path βάσης δεδομένων
-./vm-dashboard --port 8080 --db /var/lib/infraatlas/dashboard.db
+./InfraAtlas --port 8080 --db /var/lib/infraatlas/dashboard.db
 ```
 
 ### Systemd Service (προαιρετικό)
