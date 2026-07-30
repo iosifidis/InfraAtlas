@@ -1835,12 +1835,27 @@ function renderReportTable(vms) {
             if (e.target.closest('a') || e.target.closest('button')) return;
             openVMModal(v.id);
         };
+
+        let badgesHtml = '';
+        if (v.in_use === 1) badgesHtml += '<span class="badge badge-success" style="margin-left:4px;">Σε Χρήση</span>';
+        if (v.is_important === 1) badgesHtml += '<span class="badge badge-danger" style="margin-left:4px;">Important</span>';
+        if (v.vpn === 1) badgesHtml += '<span class="badge badge-info" style="margin-left:4px;">VPN</span>';
+        if (v.backup) badgesHtml += '<span class="badge badge-success" style="margin-left:4px;">Backup</span>';
+        if (v.ansible === 1) badgesHtml += '<span class="badge badge-info" style="margin-left:4px;">Ansible</span>';
+        if (v.docker === 1) badgesHtml += '<span class="badge badge-primary" style="margin-left:4px;">Docker</span>';
+
+        const specsText = `CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}${v.extra_disk > 0 ? ' +' + v.extra_disk : ''}`;
+
         row.innerHTML = `
             <td class="col-vm-info">
                 <div class="vm-row-flex">
                     <div class="vm-main-details">
                         <div class="vm-name-title">${escapeHTML(v.name)}</div>
                         <div class="vm-url-sub">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
+                        <div class="mobile-only-sub" style="font-size:0.75rem; margin-top:4px; color:var(--text-secondary);">
+                            <span>${escapeHTML(v.cluster_name)}</span> &bull; <span>${specsText}</span> &bull; <code>${escapeHTML(v.ipv4 || '-')}</code>
+                            <div style="margin-top:2px;">${badgesHtml}</div>
+                        </div>
                     </div>
                     <div class="mobile-chevron-icon">
                         <i data-lucide="chevron-right"></i>
