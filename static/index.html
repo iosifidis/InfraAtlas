@@ -62,13 +62,19 @@
 
     <!-- Main Dashboard Container -->
     <div id="app-container" class="app-layout hidden">
+        <!-- Sidebar Backdrop Overlay (Mobile) -->
+        <div id="sidebar-backdrop" class="sidebar-backdrop hidden"></div>
+
         <!-- Sidebar Navigation -->
-        <aside class="sidebar glass">
+        <aside id="sidebar" class="sidebar glass">
             <div class="sidebar-brand">
                 <div class="brand-icon">
                     <i data-lucide="activity"></i>
                 </div>
                 <span class="brand-name">InfraAtlas</span>
+                <button id="close-sidebar-btn" class="sidebar-close-btn" aria-label="Κλείσιμο Μενού" title="Κλείσιμο">
+                    <i data-lucide="x"></i>
+                </button>
             </div>
 
             <nav class="sidebar-menu">
@@ -120,9 +126,20 @@
         <!-- Main Content Area -->
         <main class="main-content">
             <header class="content-header">
-                <div>
-                    <h1 id="page-title" aria-live="polite">Dashboard</h1>
-                    <p id="page-description" class="text-secondary">Συνολική εικόνα των υποδομών σας.</p>
+                <div class="header-left">
+                    <button id="mobile-menu-btn" class="mobile-menu-btn" aria-label="Άνοιγμα Μενού" title="Μενού">
+                        <i data-lucide="menu"></i>
+                    </button>
+                    <div class="brand-mobile">
+                        <div class="brand-icon">
+                            <i data-lucide="activity"></i>
+                        </div>
+                        <span class="brand-name">InfraAtlas</span>
+                    </div>
+                    <div class="header-title-group">
+                        <h1 id="page-title" aria-live="polite">Dashboard</h1>
+                        <p id="page-description" class="text-secondary">Συνολική εικόνα των υποδομών σας.</p>
+                    </div>
                 </div>
                 <div class="header-actions">
                     <div class="status-indicator">

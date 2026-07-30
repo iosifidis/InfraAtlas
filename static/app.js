@@ -167,7 +167,50 @@ function initializeDashboard() {
     setInterval(fetchStats, 60000);
 }
 
+// Mobile Sidebar Navigation Controls
+function openMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (sidebar) sidebar.classList.add('mobile-open');
+    if (backdrop) {
+        backdrop.classList.remove('hidden');
+        setTimeout(() => backdrop.classList.add('active'), 10);
+    }
+}
+
+function closeMobileSidebar() {
+    const sidebar = document.getElementById('sidebar');
+    const backdrop = document.getElementById('sidebar-backdrop');
+    if (sidebar) sidebar.classList.remove('mobile-open');
+    if (backdrop) {
+        backdrop.classList.remove('active');
+        setTimeout(() => backdrop.classList.add('hidden'), 300);
+    }
+}
+
 function setupEventListeners() {
+    // Mobile Drawer Navigation event listeners
+    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
+    const closeSidebarBtn = document.getElementById('close-sidebar-btn');
+    const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+
+    if (mobileMenuBtn) {
+        mobileMenuBtn.addEventListener('click', openMobileSidebar);
+    }
+    if (closeSidebarBtn) {
+        closeSidebarBtn.addEventListener('click', closeMobileSidebar);
+    }
+    if (sidebarBackdrop) {
+        sidebarBackdrop.addEventListener('click', closeMobileSidebar);
+    }
+
+    // Auto-close mobile drawer when window resizes beyond 768px
+    window.addEventListener('resize', () => {
+        if (window.innerWidth > 768) {
+            closeMobileSidebar();
+        }
+    });
+
     // Menu Tab switches
     document.querySelectorAll('.menu-item').forEach(item => {
         item.addEventListener('click', (e) => {
@@ -180,6 +223,7 @@ function setupEventListeners() {
 
     // Logout
     document.getElementById('logout-btn').addEventListener('click', () => {
+        closeMobileSidebar();
         fetch('/api/auth/logout', { method: 'POST' })
             .then(() => {
                 state.loggedIn = false;
@@ -204,9 +248,17 @@ function setupEventListeners() {
     // Delete Modal confirmation button
     document.getElementById('delete-confirm-btn').addEventListener('click', confirmDeletion);
 
-    // ESC key closes any open modal
+    // ESC key closes any open modal or mobile sidebar
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
+        
+        // Close mobile menu if open
+        const sidebar = document.getElementById('sidebar');
+        if (sidebar && sidebar.classList.contains('mobile-open')) {
+            closeMobileSidebar();
+            return;
+        }
+
         const openModal = document.querySelector('.modal-overlay:not(.hidden)');
         if (!openModal) return;
         const id = openModal.id;
@@ -228,6 +280,7 @@ function setupEventListeners() {
 
 function switchTab(tabId) {
     state.activeTab = tabId;
+    closeMobileSidebar();
     
     // Toggle active classes on sidebar links
     document.querySelectorAll('.menu-item').forEach(item => {
