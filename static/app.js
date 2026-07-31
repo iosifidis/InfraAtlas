@@ -204,9 +204,9 @@ function setupEventListeners() {
         sidebarBackdrop.addEventListener('click', closeMobileSidebar);
     }
 
-    // Auto-close mobile drawer when window resizes beyond 768px
+    // Auto-close mobile drawer when window resizes beyond 992px
     window.addEventListener('resize', () => {
-        if (window.innerWidth > 768) {
+        if (window.innerWidth > 992) {
             closeMobileSidebar();
         }
     });
@@ -1849,14 +1849,12 @@ function renderReportTable(vms) {
     
     thead.innerHTML = `
         <tr>
-            <th>Όνομα VM</th>
+            <th style="max-width: 180px;">Όνομα VM</th>
             <th>Cluster</th>
             <th>Specs</th>
             <th>IPv4</th>
-            <th>VPN / Backup</th>
             <th>Σε Χρήση</th>
             <th>Σημαντικό</th>
-            <th>Docker / Ansible</th>
         </tr>
     `;
 
@@ -1876,7 +1874,7 @@ function renderReportTable(vms) {
     }
 
     if (vms.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="8" class="text-secondary" style="text-align: center; padding: 2rem;">Δεν βρέθηκαν αποτελέσματα για αυτή την αναφορά.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="text-secondary" style="text-align: center; padding: 2rem;">Δεν βρέθηκαν αποτελέσματα για αυτή την αναφορά.</td></tr>`;
         return;
     }
 
@@ -1890,24 +1888,24 @@ function renderReportTable(vms) {
         };
 
         let badgesHtml = '';
-        if (v.in_use === 1) badgesHtml += '<span class="badge badge-success" style="margin-left:4px;">Σε Χρήση</span>';
-        if (v.is_important === 1) badgesHtml += '<span class="badge badge-danger" style="margin-left:4px;">Important</span>';
-        if (v.vpn === 1) badgesHtml += '<span class="badge badge-info" style="margin-left:4px;">VPN</span>';
-        if (v.backup) badgesHtml += '<span class="badge badge-success" style="margin-left:4px;">Backup</span>';
-        if (v.ansible === 1) badgesHtml += '<span class="badge badge-info" style="margin-left:4px;">Ansible</span>';
-        if (v.docker === 1) badgesHtml += '<span class="badge badge-primary" style="margin-left:4px;">Docker</span>';
+        badgesHtml += `<span class="badge ${v.in_use === 1 ? 'badge-success' : 'badge-secondary'}" style="margin-right:4px;">Σε Χρήση: ${v.in_use === 1 ? 'Ναι' : 'Όχι'}</span>`;
+        badgesHtml += `<span class="badge ${v.is_important === 1 ? 'badge-danger' : 'badge-secondary'}" style="margin-right:4px;">Σημαντικό: ${v.is_important === 1 ? 'Ναι' : 'Όχι'}</span>`;
+        if (v.vpn === 1) badgesHtml += '<span class="badge badge-info" style="margin-right:4px;">VPN</span>';
+        if (v.backup) badgesHtml += '<span class="badge badge-success" style="margin-right:4px;">Backup</span>';
+        if (v.ansible === 1) badgesHtml += '<span class="badge badge-info" style="margin-right:4px;">Ansible</span>';
+        if (v.docker === 1) badgesHtml += '<span class="badge badge-primary" style="margin-right:4px;">Docker</span>';
 
         const specsText = `CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}${v.extra_disk > 0 ? ' +' + v.extra_disk : ''}`;
 
         row.innerHTML = `
-            <td class="col-vm-info">
+            <td class="col-vm-info" style="max-width: 170px; word-break: break-word; white-space: normal;">
                 <div class="vm-row-flex">
-                    <div class="vm-main-details">
-                        <div class="vm-name-title">${escapeHTML(v.name)}</div>
-                        <div class="vm-url-sub">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
+                    <div class="vm-main-details" style="max-width: 100%;">
+                        <div class="vm-name-title" style="word-break: break-word; white-space: normal; overflow-wrap: break-word;">${escapeHTML(v.name)}</div>
+                        <div class="vm-url-sub" style="word-break: break-all; white-space: normal;">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
                         <div class="mobile-only-sub" style="font-size:0.75rem; margin-top:4px; color:var(--text-secondary);">
                             <span>${escapeHTML(v.cluster_name)}</span> &bull; <span>${specsText}</span> &bull; <code>${escapeHTML(v.ipv4 || '-')}</code>
-                            <div style="margin-top:2px;">${badgesHtml}</div>
+                            <div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:4px;">${badgesHtml}</div>
                         </div>
                     </div>
                     <div class="mobile-chevron-icon">
@@ -1916,22 +1914,10 @@ function renderReportTable(vms) {
                 </div>
             </td>
             <td><span class="badge badge-info">${escapeHTML(v.cluster_name)}</span></td>
-            <td><span style="font-size:0.75rem;">CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}</span></td>
+            <td><span style="font-size:0.75rem; white-space:nowrap;">CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}</span></td>
             <td><code>${escapeHTML(v.ipv4 || '-')}</code></td>
-            <td>
-                <div style="font-size: 0.75rem;">
-                    <div>VPN: <span class="badge ${v.vpn === 1 ? 'badge-success' : 'badge-danger'}">${v.vpn === 1 ? 'Ναι' : 'Όχι'}</span></div>
-                    <div>Backup: ${v.backup ? `<span class="badge badge-success">${escapeHTML(v.backup)}</span>` : '<span class="badge badge-danger">Όχι</span>'}</div>
-                </div>
-            </td>
-            <td><span class="badge ${v.in_use === 1 ? 'badge-success' : 'badge-danger'}">${v.in_use === 1 ? 'Ναι' : 'Όχι'}</span></td>
-            <td><span class="badge ${v.is_important === 1 ? 'badge-danger' : 'badge-danger'}">${v.is_important === 1 ? 'Ναι' : 'Όχι'}</span></td>
-            <td>
-                <div style="display:flex; gap:4px; flex-wrap:wrap;">
-                    <span class="badge ${v.docker === 1 ? 'badge-success' : 'badge-danger'}">Docker: ${v.docker === 1 ? 'Ναι' : 'Όχι'}</span>
-                    <span class="badge ${v.ansible === 1 ? 'badge-success' : 'badge-danger'}">Ansible: ${v.ansible === 1 ? 'Ναι' : 'Όχι'}</span>
-                </div>
-            </td>
+            <td style="text-align: center;"><span class="badge ${v.in_use === 1 ? 'badge-success' : 'badge-danger'}">${v.in_use === 1 ? 'Ναι' : 'Όχι'}</span></td>
+            <td style="text-align: center;"><span class="badge ${v.is_important === 1 ? 'badge-danger' : 'badge-secondary'}">${v.is_important === 1 ? 'Ναι' : 'Όχι'}</span></td>
         `;
         tbody.appendChild(row);
     });
