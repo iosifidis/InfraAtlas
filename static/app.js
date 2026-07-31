@@ -1888,8 +1888,8 @@ function renderReportTable(vms) {
         };
 
         let badgesHtml = '';
-        badgesHtml += `<span class="badge ${v.in_use === 1 ? 'badge-success' : 'badge-secondary'}" style="margin-right:4px;">Σε Χρήση: ${v.in_use === 1 ? 'Ναι' : 'Όχι'}</span>`;
-        badgesHtml += `<span class="badge ${v.is_important === 1 ? 'badge-danger' : 'badge-secondary'}" style="margin-right:4px;">Σημαντικό: ${v.is_important === 1 ? 'Ναι' : 'Όχι'}</span>`;
+        badgesHtml += `<span class="badge ${v.in_use === 1 ? 'badge-success' : 'badge-danger'}" style="margin-right:4px;">Σε Χρήση: ${v.in_use === 1 ? 'Ναι' : 'Όχι'}</span>`;
+        badgesHtml += `<span class="badge ${v.is_important === 1 ? 'badge-success' : 'badge-danger'}" style="margin-right:4px;">Σημαντικό: ${v.is_important === 1 ? 'Ναι' : 'Όχι'}</span>`;
         if (v.vpn === 1) badgesHtml += '<span class="badge badge-info" style="margin-right:4px;">VPN</span>';
         if (v.backup) badgesHtml += '<span class="badge badge-success" style="margin-right:4px;">Backup</span>';
         if (v.ansible === 1) badgesHtml += '<span class="badge badge-info" style="margin-right:4px;">Ansible</span>';
@@ -1917,7 +1917,7 @@ function renderReportTable(vms) {
             <td><span style="font-size:0.75rem; white-space:nowrap;">CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}</span></td>
             <td><code>${escapeHTML(v.ipv4 || '-')}</code></td>
             <td style="text-align: center;"><span class="badge ${v.in_use === 1 ? 'badge-success' : 'badge-danger'}">${v.in_use === 1 ? 'Ναι' : 'Όχι'}</span></td>
-            <td style="text-align: center;"><span class="badge ${v.is_important === 1 ? 'badge-danger' : 'badge-secondary'}">${v.is_important === 1 ? 'Ναι' : 'Όχι'}</span></td>
+            <td style="text-align: center;"><span class="badge ${v.is_important === 1 ? 'badge-success' : 'badge-danger'}">${v.is_important === 1 ? 'Ναι' : 'Όχι'}</span></td>
         `;
         tbody.appendChild(row);
     });
