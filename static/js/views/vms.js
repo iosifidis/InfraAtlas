@@ -169,7 +169,7 @@ export function renderUpgradesTab() {
                         <div class="mobile-only-sub" style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
                             ${escapeHTML(v.cluster_name)} ${v.ipv4 ? ' | <code>' + escapeHTML(v.ipv4) + '</code>' : ''}
                         </div>
-                        <div class="upgrades-mobile-toggles" style="margin-top:6px; display:flex; align-items:center; gap:0.75rem;">
+                        <div class="upgrades-mobile-toggles" style="margin-top:6px; gap:0.75rem;">
                             <label class="switch switch-small" title="Αναβάθμιση OS" onclick="event.stopPropagation();">
                                 <span style="font-size:0.75rem; margin-right:4px; color:var(--text-secondary);">OS:</span>
                                 <input type="checkbox" ${Number(v.os_upgrade) === 1 ? 'checked' : ''} onchange="toggleVMUpgrade(${v.id}, 'os_upgrade', this.checked)">
