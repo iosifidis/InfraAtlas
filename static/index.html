@@ -42,6 +42,9 @@
                     <div class="input-wrapper">
                         <i data-lucide="lock"></i>
                         <input type="password" id="auth-password" required placeholder="••••••••">
+                        <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('auth-password', this)" title="Εμφάνιση/Απόκρυψη συνθηματικού" aria-label="Εμφάνιση/Απόκρυψη συνθηματικού">
+                            <i data-lucide="eye"></i>
+                        </button>
                     </div>
                 </div>
                 <div id="auth-confirm-group" class="form-group hidden">
@@ -49,6 +52,9 @@
                     <div class="input-wrapper">
                         <i data-lucide="shield-check"></i>
                         <input type="password" id="auth-confirm-password" placeholder="••••••••">
+                        <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('auth-confirm-password', this)" title="Εμφάνιση/Απόκρυψη συνθηματικού" aria-label="Εμφάνιση/Απόκρυψη συνθηματικού">
+                            <i data-lucide="eye"></i>
+                        </button>
                     </div>
                 </div>
                 <button type="submit" id="auth-submit-btn" class="btn btn-primary btn-full">
@@ -1093,16 +1099,34 @@
                 </div>
                 <div class="form-group">
                     <label for="profile-current-password">Τρέχων Κωδικός Πρόσβασης (απαιτείται)</label>
-                    <input type="password" id="profile-current-password" required placeholder="••••••••">
+                    <div class="input-wrapper">
+                        <i data-lucide="lock"></i>
+                        <input type="password" id="profile-current-password" required placeholder="••••••••">
+                        <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('profile-current-password', this)" title="Εμφάνιση/Απόκρυψη συνθηματικού" aria-label="Εμφάνιση/Απόκρυψη συνθηματικού">
+                            <i data-lucide="eye"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="divider"><span>Αλλαγή Κωδικού (Προαιρετικά)</span></div>
                 <div class="form-group">
                     <label for="profile-new-password">Νέος Κωδικός Πρόσβασης</label>
-                    <input type="password" id="profile-new-password" placeholder="Αφήστε το κενό αν δεν θέλετε αλλαγή">
+                    <div class="input-wrapper">
+                        <i data-lucide="key"></i>
+                        <input type="password" id="profile-new-password" placeholder="Αφήστε το κενό αν δεν θέλετε αλλαγή">
+                        <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('profile-new-password', this)" title="Εμφάνιση/Απόκρυψη συνθηματικού" aria-label="Εμφάνιση/Απόκρυψη συνθηματικού">
+                            <i data-lucide="eye"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="form-group">
                     <label for="profile-confirm-password">Επιβεβαίωση Νέου Κωδικού</label>
-                    <input type="password" id="profile-confirm-password" placeholder="Επαναλάβετε το νέο κωδικό">
+                    <div class="input-wrapper">
+                        <i data-lucide="shield-check"></i>
+                        <input type="password" id="profile-confirm-password" placeholder="Επαναλάβετε το νέο κωδικό">
+                        <button type="button" class="btn-toggle-password" onclick="togglePasswordVisibility('profile-confirm-password', this)" title="Εμφάνιση/Απόκρυψη συνθηματικού" aria-label="Εμφάνιση/Απόκρυψη συνθηματικού">
+                            <i data-lucide="eye"></i>
+                        </button>
+                    </div>
                 </div>
                 <div id="profile-alert" class="alert hidden" style="margin-top: 1rem;"></div>
                 <div class="modal-actions">

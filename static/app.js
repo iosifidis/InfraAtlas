@@ -178,6 +178,21 @@ function openMobileSidebar() {
     }
 }
 
+// Toggle password input visibility between text and password
+function togglePasswordVisibility(inputId, btn) {
+    const input = document.getElementById(inputId);
+    if (!input) return;
+    const isPassword = input.type === 'password';
+    input.type = isPassword ? 'text' : 'password';
+    const iconName = isPassword ? 'eye-off' : 'eye';
+    btn.innerHTML = `<i data-lucide="${iconName}"></i>`;
+    if (window.lucide) {
+        window.lucide.createIcons({
+            nodes: [btn]
+        });
+    }
+}
+
 function closeMobileSidebar() {
     const sidebar = document.getElementById('sidebar');
     const backdrop = document.getElementById('sidebar-backdrop');
