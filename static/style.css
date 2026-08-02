@@ -296,6 +296,35 @@ button, input, select, textarea {
 
 .input-wrapper input {
     padding-left: 38px;
+    padding-right: 42px;
+}
+
+.btn-toggle-password {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-sm);
+    transition: var(--transition);
+}
+
+.btn-toggle-password:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.1);
+}
+
+.btn-toggle-password i,
+.btn-toggle-password svg {
+    width: 18px;
+    height: 18px;
 }
 
 input[type="text"],

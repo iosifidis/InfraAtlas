@@ -10,6 +10,8 @@ data/*
 
 # Go Executables & Binaries
 /vm-dashboard
+/infraatlas
+infraatlas
 *.exe
 *.exe?
 *.dll
