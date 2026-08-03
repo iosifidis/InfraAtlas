@@ -82,7 +82,7 @@ export function renderDNSRecords() {
                 <div class="vm-row-flex">
                     <div class="vm-main-details">
                         <div class="vm-name-title">${escapeHTML(r.name)}</div>
-                        <div class="vm-url-sub"><code>${escapeHTML(r.value)}</code> &nbsp;<span class="badge ${badgeClass}" style="font-size:0.7rem;">${escapeHTML(r.type)}</span></div>
+                        <div class="mobile-only-sub" style="margin-top:2px;"><code>${escapeHTML(r.value)}</code> &nbsp;<span class="badge ${badgeClass}" style="font-size:0.7rem;">${escapeHTML(r.type)}</span></div>
                         ${r.description ? `<div style="font-size: 0.75rem; color: var(--text-secondary); margin-top:2px;">${escapeHTML(r.description)}</div>` : ''}
                     </div>
                     <div class="mobile-chevron-icon">
