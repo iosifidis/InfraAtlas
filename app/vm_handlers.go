@@ -1,8 +1,10 @@
 package app
 
 import (
+	"database/sql"
 	"encoding/csv"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -16,44 +18,38 @@ type parsedVMItem struct {
 	clusterName string
 }
 
+func parseIntQueryParam(val string) *int {
+	if val == "" {
+		return nil
+	}
+	if n, err := strconv.Atoi(val); err == nil {
+		return &n
+	}
+	return nil
+}
+
+func parseVMFilter(r *http.Request) VMFilter {
+	q := r.URL.Query()
+	var clusterID int64
+	if cid := q.Get("cluster_id"); cid != "" {
+		clusterID, _ = strconv.ParseInt(cid, 10, 64)
+	}
+	return VMFilter{
+		ClusterID:   clusterID,
+		InUse:       parseIntQueryParam(q.Get("in_use")),
+		IsImportant: parseIntQueryParam(q.Get("is_important")),
+		Monitored:   parseIntQueryParam(q.Get("monitored")),
+		Ansible:     parseIntQueryParam(q.Get("ansible")),
+		Docker:      parseIntQueryParam(q.Get("docker")),
+		Search:      q.Get("search"),
+	}
+}
+
 // handleVMs manages listing and creating Virtual Machines.
 func handleVMs(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		q := r.URL.Query()
-
-		var clusterID int64
-		if cid := q.Get("cluster_id"); cid != "" {
-			clusterID, _ = strconv.ParseInt(cid, 10, 64)
-		}
-
-		var inUse *int
-		if iu := q.Get("in_use"); iu != "" {
-			val, err := strconv.Atoi(iu)
-			if err == nil {
-				inUse = &val
-			}
-		}
-
-		var isImportant *int
-		if imp := q.Get("is_important"); imp != "" {
-			val, err := strconv.Atoi(imp)
-			if err == nil {
-				isImportant = &val
-			}
-		}
-
-		var monitored *int
-		if mon := q.Get("monitored"); mon != "" {
-			val, err := strconv.Atoi(mon)
-			if err == nil {
-				monitored = &val
-			}
-		}
-
-		search := q.Get("search")
-
-		vms, err := GetVMs(clusterID, inUse, isImportant, monitored, search)
+		vms, err := GetVMs(parseVMFilter(r))
 		if err != nil {
 			respondWithError(w, http.StatusInternalServerError, err.Error())
 			return
@@ -113,6 +109,10 @@ func handleVMDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := UpdateVM(&v); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				respondWithError(w, http.StatusNotFound, "VM not found")
+				return
+			}
 			respondWithError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -150,6 +150,10 @@ func handleVMDetail(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodDelete:
 		if err := DeleteVM(id); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				respondWithError(w, http.StatusNotFound, "VM not found")
+				return
+			}
 			respondWithError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -167,40 +171,7 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	q := r.URL.Query()
-
-	var clusterID int64
-	if cid := q.Get("cluster_id"); cid != "" {
-		clusterID, _ = strconv.ParseInt(cid, 10, 64)
-	}
-
-	var inUse *int
-	if iu := q.Get("in_use"); iu != "" {
-		val, err := strconv.Atoi(iu)
-		if err == nil {
-			inUse = &val
-		}
-	}
-
-	var isImportant *int
-	if imp := q.Get("is_important"); imp != "" {
-		val, err := strconv.Atoi(imp)
-		if err == nil {
-			isImportant = &val
-		}
-	}
-
-	var monitored *int
-	if mon := q.Get("monitored"); mon != "" {
-		val, err := strconv.Atoi(mon)
-		if err == nil {
-			monitored = &val
-		}
-	}
-
-	search := q.Get("search")
-
-	vms, err := GetVMs(clusterID, inUse, isImportant, monitored, search)
+	vms, err := GetVMs(parseVMFilter(r))
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return
@@ -219,8 +190,8 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 
 	headers := []string{
 		"Όνομα VM", "Cluster", "URL", "Σε Χρήση", "Σημαντικό", "Χρήση από Εμάς",
-		"CPU", "RAM", "Δίσκος", "Extra Δίσκος", "IPv4", "IPv6",
-		"VPN", "Backup", "Monitored", "OS", "OS Version", "Υπεύθυνος Επικοινωνίας", "Περιγραφή",
+		"Ansible", "Docker", "CPU", "RAM", "Δίσκος", "Extra Δίσκος", "IPv4", "IPv6",
+		"VPN", "Backup", "Monitored", "Αναβάθμιση OS", "Αναβάθμιση App", "OS", "OS Version", "Υπεύθυνος Επικοινωνίας", "Περιγραφή",
 	}
 	_ = cw.Write(headers)
 
@@ -232,6 +203,8 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 			boolToGreek(v.InUse),
 			boolToGreek(v.IsImportant),
 			boolToGreek(v.UsedByUs),
+			boolToGreek(v.Ansible),
+			boolToGreek(v.Docker),
 			fmt.Sprintf("%.1f", v.CPU),
 			fmt.Sprintf("%.1f", v.RAM),
 			fmt.Sprintf("%.1f", v.Disk),
@@ -241,6 +214,8 @@ func handleExportCSV(w http.ResponseWriter, r *http.Request) {
 			boolToGreek(v.VPN),
 			v.Backup,
 			boolToGreek(v.Monitored),
+			boolToGreek(v.OSUpgrade),
+			boolToGreek(v.AppUpgrade),
 			v.OS,
 			v.OSVersion,
 			v.ContactPerson,
@@ -258,6 +233,7 @@ func importVMsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB limit
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		respondWithError(w, http.StatusBadRequest, "Failed to read request body")
@@ -270,40 +246,10 @@ func importVMsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inserted, updated := 0, 0
-	clusterCache := make(map[string]int64)
-
-	for _, item := range parsedItems {
-		cName := strings.TrimSpace(item.clusterName)
-		if cName == "" {
-			cName = "General Cluster"
-		}
-
-		clusterID, exists := clusterCache[strings.ToLower(cName)]
-		if !exists {
-			var err error
-			clusterID, err = GetOrCreateClusterByName(cName)
-			if err != nil {
-				respondWithError(w, http.StatusInternalServerError, "Failed to create/get cluster: "+err.Error())
-				return
-			}
-			clusterCache[strings.ToLower(cName)] = clusterID
-		}
-
-		vm := item.vm
-		vm.ClusterID = clusterID
-
-		created, err := UpsertVMByName(&vm)
-		if err != nil {
-			respondWithError(w, http.StatusInternalServerError, "Failed to save VM: "+err.Error())
-			return
-		}
-
-		if created {
-			inserted++
-		} else {
-			updated++
-		}
+	inserted, updated, err := BulkUpsertVMs(parsedItems)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Failed to save VMs: "+err.Error())
+		return
 	}
 
 	respondWithJSON(w, http.StatusOK, map[string]interface{}{

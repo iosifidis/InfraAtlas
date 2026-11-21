@@ -1,5 +1,6 @@
 import { state } from '../state.js';
-import { escapeHTML, showToast } from '../utils.js';
+import { escapeHTML, sanitizeURL, csvEscape, showToast } from '../utils.js';
+import { apiFetch } from '../api.js';
 
 export function normalizeHost(str) {
     if (!str) return '';
@@ -124,8 +125,8 @@ export function runReport() {
 
     if (state.activeReportPreset === 'unmatched-dns') {
         Promise.all([
-            fetch('/api/vms').then(r => r.json()),
-            fetch('/api/dns').then(r => r.json())
+            apiFetch('/api/vms'),
+            apiFetch('/api/dns')
         ])
         .then(([vms, dnsRecords]) => {
             const unmatchedDNS = (dnsRecords || []).filter(r => !isDNSRecordMatchedToVM(r, vms || []));
@@ -137,8 +138,8 @@ export function runReport() {
 
     if (state.activeReportPreset === 'unmatched-vms') {
         Promise.all([
-            fetch('/api/vms').then(r => r.json()),
-            fetch('/api/dns').then(r => r.json())
+            apiFetch('/api/vms'),
+            apiFetch('/api/dns')
         ])
         .then(([vms, dnsRecords]) => {
             let unmatchedVMs = (vms || []).filter(v => !isVMMatchedToDNS(v, dnsRecords || []));
@@ -162,8 +163,7 @@ export function runReport() {
 
     const url = '/api/vms' + (queryParams.length ? '?' + queryParams.join('&') : '');
 
-    fetch(url)
-        .then(res => res.json())
+    apiFetch(url)
         .then(data => {
             let vms = data || [];
             
@@ -284,7 +284,7 @@ export function renderUnmatchedVMsTable(vms) {
                 <div class="vm-row-flex">
                     <div class="vm-main-details">
                         <div class="vm-name-title">${escapeHTML(v.name)}</div>
-                        <div class="vm-url-sub">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
+                        <div class="vm-url-sub">${v.url ? `<a href="${escapeHTML(sanitizeURL(v.url))}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
                     </div>
                     <div class="mobile-chevron-icon">
                         <i data-lucide="chevron-right"></i>
@@ -293,7 +293,7 @@ export function renderUnmatchedVMsTable(vms) {
             </td>
             <td><span class="badge badge-info">${escapeHTML(v.cluster_name)}</span></td>
             <td><code>${escapeHTML(v.ipv4 || v.ipv6 || '-')}</code></td>
-            <td><span style="font-size:0.8125rem;">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '-'}</span></td>
+            <td><span style="font-size:0.8125rem;">${v.url ? `<a href="${escapeHTML(sanitizeURL(v.url))}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '-'}</span></td>
             <td><span class="badge badge-warning">Χωρίς DNS</span></td>
             <td class="actions-col">
                 <button class="btn-icon-only text-danger" onclick="event.stopPropagation(); openDeleteModal('vm', ${v.id})" title="Διαγραφή VM"><i data-lucide="trash-2"></i></button>
@@ -365,7 +365,7 @@ export function renderReportTable(vms) {
                 <div class="vm-row-flex">
                     <div class="vm-main-details" style="max-width: 100%;">
                         <div class="vm-name-title" style="word-break: break-word; white-space: normal; overflow-wrap: break-word;">${escapeHTML(v.name)}</div>
-                        <div class="vm-url-sub" style="word-break: break-all; white-space: normal;">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
+                        <div class="vm-url-sub" style="word-break: break-all; white-space: normal;">${v.url ? `<a href="${escapeHTML(sanitizeURL(v.url))}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
                         <div class="mobile-only-sub" style="font-size:0.75rem; margin-top:4px; color:var(--text-secondary);">
                             <span>${escapeHTML(v.cluster_name)}</span> &bull; <span>${specsText}</span> &bull; <code>${escapeHTML(v.ipv4 || '-')}</code>
                             <div style="margin-top:4px; display:flex; flex-wrap:wrap; gap:4px;">${badgesHtml}</div>
@@ -396,36 +396,43 @@ export function exportReportCSV() {
             showToast('Δεν υπάρχουν δεδομένα προς εξαγωγή.', 'error');
             return;
         }
-        let csvContent = 'data:text/csv;charset=utf-8,\uFEFF';
+        let csvContent = '\uFEFF';
         if (state.activeReportPreset === 'unmatched-dns') {
             csvContent += 'Domain / Hostname,Type,Value,Audit Status\n';
             items.forEach(r => {
-                csvContent += `"${r.name}","${r.type}","${r.value}","Unmatched DNS - Candidate for Deletion"\n`;
+                csvContent += `${csvEscape(r.name)},${csvEscape(r.type)},${csvEscape(r.value)},"Unmatched DNS - Candidate for Deletion"\n`;
             });
         } else {
             csvContent += 'VM Name,Cluster,IPv4,IPv6,URL,Audit Status\n';
             items.forEach(v => {
-                csvContent += `"${v.name}","${v.cluster_name}","${v.ipv4 || ''}","${v.ipv6 || ''}","${v.url || ''}","Unmatched VM - Candidate for Deletion"\n`;
+                csvContent += `${csvEscape(v.name)},${csvEscape(v.cluster_name)},${csvEscape(v.ipv4)},${csvEscape(v.ipv6)},${csvEscape(v.url)},"Unmatched VM - Candidate for Deletion"\n`;
             });
         }
-        const encodedUri = encodeURI(csvContent);
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const blobUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.setAttribute('href', encodedUri);
+        link.setAttribute('href', blobUrl);
         link.setAttribute('download', `report_${state.activeReportPreset}_${new Date().toISOString().slice(0,10)}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        URL.revokeObjectURL(blobUrl);
         return;
     }
 
     const clusterId = document.getElementById('report-cluster').value;
     const inUse = document.getElementById('report-in-use').value;
     const important = document.getElementById('report-important').value;
+    const ansible = document.getElementById('report-ansible').value;
+    const docker = document.getElementById('report-docker').value;
     
     let queryParams = [];
-    if (clusterId) queryParams.push(`cluster_id=${clusterId}`);
-    if (inUse !== '') queryParams.push(`in_use=${inUse}`);
-    if (important !== '') queryParams.push(`is_important=${important}`);
+    if (clusterId) queryParams.push(`cluster_id=${encodeURIComponent(clusterId)}`);
+    if (inUse !== '') queryParams.push(`in_use=${encodeURIComponent(inUse)}`);
+    if (important !== '') queryParams.push(`is_important=${encodeURIComponent(important)}`);
+    if (ansible !== '') queryParams.push(`ansible=${encodeURIComponent(ansible)}`);
+    if (docker !== '') queryParams.push(`docker=${encodeURIComponent(docker)}`);
+    if (state.activeReportPreset === 'unmonitored') queryParams.push('monitored=0');
     
     const url = '/api/export/csv' + (queryParams.length ? '?' + queryParams.join('&') : '');
     window.open(url, '_blank');

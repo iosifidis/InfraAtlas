@@ -10,6 +10,23 @@ export function escapeHTML(str) {
         .replace(/'/g, '&#039;');
 }
 
+export function sanitizeURL(url) {
+    if (!url) return '#';
+    const trimmed = String(url).trim();
+    if (/^https?:\/\//i.test(trimmed)) {
+        return trimmed;
+    }
+    if (/^[a-zA-Z][a-zA-Z0-9+.-]*:/.test(trimmed)) {
+        return '#';
+    }
+    return `https://${trimmed}`;
+}
+
+export function csvEscape(val) {
+    const str = val === null || val === undefined ? '' : String(val);
+    return `"${str.replace(/"/g, '""')}"`;
+}
+
 export function debounce(fn, delay = 300) {
     let timer;
     return function (...args) {

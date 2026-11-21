@@ -171,18 +171,91 @@ func migrate() error {
 	}
 
 	// Auto-migrations for new columns on existing database files
-	DB.Exec("ALTER TABLE vms ADD COLUMN os_upgrade INTEGER DEFAULT 0;")
-	DB.Exec("ALTER TABLE vms ADD COLUMN app_upgrade INTEGER DEFAULT 0;")
+	if err := ensureVMColumns(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func hasColumn(table, col string) (bool, error) {
+	rows, err := DB.Query(fmt.Sprintf("PRAGMA table_info(%s);", table))
+	if err != nil {
+		return false, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull int
+		var dflt sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return false, err
+		}
+		if strings.EqualFold(name, col) {
+			return true, nil
+		}
+	}
+	return false, rows.Err()
+}
+
+func getColumnType(table, col string) (string, error) {
+	rows, err := DB.Query(fmt.Sprintf("PRAGMA table_info(%s);", table))
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var cid int
+		var name, ctype string
+		var notnull int
+		var dflt sql.NullString
+		var pk int
+		if err := rows.Scan(&cid, &name, &ctype, &notnull, &dflt, &pk); err != nil {
+			return "", err
+		}
+		if strings.EqualFold(name, col) {
+			return strings.ToUpper(ctype), nil
+		}
+	}
+	return "", rows.Err()
+}
+
+func ensureVMColumns() error {
+	for _, col := range []string{"os_upgrade", "app_upgrade", "ansible", "docker"} {
+		exists, err := hasColumn("vms", col)
+		if err != nil {
+			return err
+		}
+		if !exists {
+			if _, err := DB.Exec(fmt.Sprintf("ALTER TABLE vms ADD COLUMN %s INTEGER DEFAULT 0;", col)); err != nil {
+				return err
+			}
+		}
+	}
 
 	// Migration: fix vpn column TEXT → INTEGER (SQLite RENAME COLUMN: v3.25+)
-	DB.Exec(`ALTER TABLE vms RENAME COLUMN vpn TO vpn_legacy;`)
-	DB.Exec(`ALTER TABLE vms ADD COLUMN vpn INTEGER DEFAULT 0;`)
-	DB.Exec(`UPDATE vms SET vpn = 1
-		WHERE LOWER(COALESCE(vpn_legacy,'')) IN ('1','true','yes','nai','ναι')
-		   OR LOWER(COALESCE(vpn_legacy,'')) LIKE '%vpn%'
-		   OR LOWER(COALESCE(vpn_legacy,'')) LIKE '%client%';`)
-	DB.Exec("ALTER TABLE vms ADD COLUMN ansible INTEGER DEFAULT 0;")
-	DB.Exec("ALTER TABLE vms ADD COLUMN docker INTEGER DEFAULT 0;")
+	vpnType, err := getColumnType("vms", "vpn")
+	if err != nil {
+		return err
+	}
+	if vpnType == "TEXT" {
+		if _, err := DB.Exec(`ALTER TABLE vms RENAME COLUMN vpn TO vpn_legacy;`); err != nil {
+			return err
+		}
+		if _, err := DB.Exec(`ALTER TABLE vms ADD COLUMN vpn INTEGER DEFAULT 0;`); err != nil {
+			return err
+		}
+		if _, err := DB.Exec(`UPDATE vms SET vpn = 1
+			WHERE LOWER(COALESCE(vpn_legacy,'')) IN ('1','true','yes','nai','ναι')
+			   OR LOWER(COALESCE(vpn_legacy,'')) LIKE '%vpn%'
+			   OR LOWER(COALESCE(vpn_legacy,'')) LIKE '%client%';`); err != nil {
+			return err
+		}
+	}
 
 	return nil
 }
@@ -250,14 +323,26 @@ func CreateCluster(c *Cluster) error {
 
 func UpdateCluster(c *Cluster) error {
 	query := `UPDATE clusters SET name = ?, description = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	_, err := DB.Exec(query, c.Name, c.Description, c.ID)
-	return err
+	res, err := DB.Exec(query, c.Name, c.Description, c.ID)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func DeleteCluster(id int64) error {
 	query := `DELETE FROM clusters WHERE id = ?`
-	_, err := DB.Exec(query, id)
-	return err
+	res, err := DB.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func GetOrCreateClusterByName(name string) (int64, error) {
@@ -283,37 +368,82 @@ func GetOrCreateClusterByName(name string) (int64, error) {
 
 // --- VMs CRUD ---
 
-func GetVMs(clusterID int64, inUse *int, isImportant *int, monitored *int, search string) ([]VM, error) {
-	query := `
+// VMFilter specifies optional filters for querying VMs.
+type VMFilter struct {
+	ClusterID   int64
+	InUse       *int
+	IsImportant *int
+	Monitored   *int
+	Ansible     *int
+	Docker      *int
+	Search      string
+}
+
+const vmSelectColumns = `
 		SELECT v.id, v.cluster_id, c.name as cluster_name, v.name, v.default_password, v.url, 
 		       v.in_use, v.is_important, v.used_by_us, v.ansible, v.docker, v.cpu, v.ram, v.disk, v.extra_disk, 
 		       v.ipv4, v.ipv6, v.vpn, v.backup, v.monitored, v.os_upgrade, v.app_upgrade, v.os, v.os_version, 
 		       v.contact_person, v.description, v.created_at, v.updated_at
 		FROM vms v
-		JOIN clusters c ON v.cluster_id = c.id
-		WHERE 1=1
-	`
+		JOIN clusters c ON v.cluster_id = c.id`
+
+func scanVM(scanner interface{ Scan(...any) error }) (VM, error) {
+	var v VM
+	var pass, url, ipv4, ipv6, backup, os, osVer, contact, desc sql.NullString
+	var vpn sql.NullInt64
+	err := scanner.Scan(
+		&v.ID, &v.ClusterID, &v.ClusterName, &v.Name, &pass, &url,
+		&v.InUse, &v.IsImportant, &v.UsedByUs, &v.Ansible, &v.Docker, &v.CPU, &v.RAM, &v.Disk, &v.ExtraDisk,
+		&ipv4, &ipv6, &vpn, &backup, &v.Monitored, &v.OSUpgrade, &v.AppUpgrade, &os, &osVer,
+		&contact, &desc, &v.CreatedAt, &v.UpdatedAt,
+	)
+	if err != nil {
+		return v, err
+	}
+	v.DefaultPassword = pass.String
+	v.URL = url.String
+	v.IPv4 = ipv4.String
+	v.IPv6 = ipv6.String
+	v.VPN = int(vpn.Int64)
+	v.Backup = backup.String
+	v.OS = os.String
+	v.OSVersion = osVer.String
+	v.ContactPerson = contact.String
+	v.Description = desc.String
+	return v, nil
+}
+
+func GetVMs(f VMFilter) ([]VM, error) {
+	query := vmSelectColumns + "\n\t\tWHERE 1=1\n\t"
 	var args []interface{}
 
-	if clusterID > 0 {
+	if f.ClusterID > 0 {
 		query += " AND v.cluster_id = ?"
-		args = append(args, clusterID)
+		args = append(args, f.ClusterID)
 	}
-	if inUse != nil {
+	if f.InUse != nil {
 		query += " AND v.in_use = ?"
-		args = append(args, *inUse)
+		args = append(args, *f.InUse)
 	}
-	if isImportant != nil {
+	if f.IsImportant != nil {
 		query += " AND v.is_important = ?"
-		args = append(args, *isImportant)
+		args = append(args, *f.IsImportant)
 	}
-	if monitored != nil {
+	if f.Monitored != nil {
 		query += " AND v.monitored = ?"
-		args = append(args, *monitored)
+		args = append(args, *f.Monitored)
 	}
-	if search != "" {
+	if f.Ansible != nil {
+		query += " AND v.ansible = ?"
+		args = append(args, *f.Ansible)
+	}
+	if f.Docker != nil {
+		query += " AND v.docker = ?"
+		args = append(args, *f.Docker)
+	}
+	if f.Search != "" {
 		query += " AND (v.name LIKE ? OR v.ipv4 LIKE ? OR v.ipv6 LIKE ? OR v.url LIKE ? OR v.os LIKE ? OR v.contact_person LIKE ? OR v.description LIKE ?)"
-		likePattern := "%" + search + "%"
+		likePattern := "%" + f.Search + "%"
 		args = append(args, likePattern, likePattern, likePattern, likePattern, likePattern, likePattern, likePattern)
 	}
 
@@ -327,28 +457,10 @@ func GetVMs(clusterID int64, inUse *int, isImportant *int, monitored *int, searc
 
 	var vms []VM
 	for rows.Next() {
-		var v VM
-		var pass, url, ipv4, ipv6, backup, os, osVer, contact, desc sql.NullString
-		var vpn sql.NullInt64
-		err := rows.Scan(
-			&v.ID, &v.ClusterID, &v.ClusterName, &v.Name, &pass, &url,
-			&v.InUse, &v.IsImportant, &v.UsedByUs, &v.Ansible, &v.Docker, &v.CPU, &v.RAM, &v.Disk, &v.ExtraDisk,
-			&ipv4, &ipv6, &vpn, &backup, &v.Monitored, &v.OSUpgrade, &v.AppUpgrade, &os, &osVer,
-			&contact, &desc, &v.CreatedAt, &v.UpdatedAt,
-		)
+		v, err := scanVM(rows)
 		if err != nil {
 			return nil, err
 		}
-		v.DefaultPassword = pass.String
-		v.URL = url.String
-		v.IPv4 = ipv4.String
-		v.IPv6 = ipv6.String
-		v.VPN = int(vpn.Int64)
-		v.Backup = backup.String
-		v.OS = os.String
-		v.OSVersion = osVer.String
-		v.ContactPerson = contact.String
-		v.Description = desc.String
 		vms = append(vms, v)
 	}
 	if err := rows.Err(); err != nil {
@@ -369,38 +481,7 @@ func parseBoolInt(s string) int {
 }
 
 func GetVM(id int64) (VM, error) {
-	var v VM
-	var pass, url, ipv4, ipv6, backup, os, osVer, contact, desc sql.NullString
-	var vpn sql.NullInt64
-	query := `
-		SELECT v.id, v.cluster_id, c.name as cluster_name, v.name, v.default_password, v.url, 
-		       v.in_use, v.is_important, v.used_by_us, v.ansible, v.docker, v.cpu, v.ram, v.disk, v.extra_disk, 
-		       v.ipv4, v.ipv6, v.vpn, v.backup, v.monitored, v.os_upgrade, v.app_upgrade, v.os, v.os_version, 
-		       v.contact_person, v.description, v.created_at, v.updated_at
-		FROM vms v
-		JOIN clusters c ON v.cluster_id = c.id
-		WHERE v.id = ?
-	`
-	err := DB.QueryRow(query, id).Scan(
-		&v.ID, &v.ClusterID, &v.ClusterName, &v.Name, &pass, &url,
-		&v.InUse, &v.IsImportant, &v.UsedByUs, &v.Ansible, &v.Docker, &v.CPU, &v.RAM, &v.Disk, &v.ExtraDisk,
-		&ipv4, &ipv6, &vpn, &backup, &v.Monitored, &v.OSUpgrade, &v.AppUpgrade, &os, &osVer,
-		&contact, &desc, &v.CreatedAt, &v.UpdatedAt,
-	)
-	if err != nil {
-		return v, err
-	}
-	v.DefaultPassword = pass.String
-	v.URL = url.String
-	v.IPv4 = ipv4.String
-	v.IPv6 = ipv6.String
-	v.VPN = int(vpn.Int64)
-	v.Backup = backup.String
-	v.OS = os.String
-	v.OSVersion = osVer.String
-	v.ContactPerson = contact.String
-	v.Description = desc.String
-	return v, nil
+	return scanVM(DB.QueryRow(vmSelectColumns+" WHERE v.id = ?", id))
 }
 
 func CreateVM(v *VM) error {
@@ -431,12 +512,18 @@ func UpdateVM(v *VM) error {
 			os = ?, os_version = ?, contact_person = ?, description = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
-	_, err := DB.Exec(query,
+	res, err := DB.Exec(query,
 		v.ClusterID, v.Name, v.DefaultPassword, v.URL, v.InUse, v.IsImportant, v.UsedByUs, v.Ansible, v.Docker,
 		v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored, v.OSUpgrade, v.AppUpgrade,
 		v.OS, v.OSVersion, v.ContactPerson, v.Description, v.ID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func UpsertVMByName(v *VM) (created bool, err error) {
@@ -467,8 +554,101 @@ func PatchVMUpgradeFlags(id int64, osUpgrade int, appUpgrade int) error {
 
 func DeleteVM(id int64) error {
 	query := `DELETE FROM vms WHERE id = ?`
-	_, err := DB.Exec(query, id)
-	return err
+	res, err := DB.Exec(query, id)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+// BulkUpsertVMs runs VM CSV import inside a single SQLite transaction.
+func BulkUpsertVMs(items []parsedVMItem) (int, int, error) {
+	tx, err := DB.Begin()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	inserted, updated := 0, 0
+	clusterCache := make(map[string]int64)
+
+	for _, item := range items {
+		cName := strings.TrimSpace(item.clusterName)
+		if cName == "" {
+			cName = "General Cluster"
+		}
+
+		key := strings.ToLower(cName)
+		clusterID, exists := clusterCache[key]
+		if !exists {
+			err := tx.QueryRow("SELECT id FROM clusters WHERE LOWER(name) = LOWER(?)", cName).Scan(&clusterID)
+			if err != nil {
+				res, err := tx.Exec(
+					`INSERT INTO clusters (name, description, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
+					cName, "Αυτόματα δημιουργημένο σύμπλεγμα από εισαγωγή CSV",
+				)
+				if err != nil {
+					return 0, 0, err
+				}
+				clusterID, err = res.LastInsertId()
+				if err != nil {
+					return 0, 0, err
+				}
+			}
+			clusterCache[key] = clusterID
+		}
+
+		v := item.vm
+		v.ClusterID = clusterID
+
+		var existingID int64
+		err := tx.QueryRow("SELECT id FROM vms WHERE cluster_id = ? AND LOWER(name) = LOWER(?)", v.ClusterID, strings.ToLower(v.Name)).Scan(&existingID)
+		if err != nil {
+			err = tx.QueryRow("SELECT id FROM vms WHERE LOWER(name) = LOWER(?)", strings.ToLower(v.Name)).Scan(&existingID)
+		}
+
+		if err == nil {
+			_, err = tx.Exec(`
+				UPDATE vms SET 
+					cluster_id = ?, name = ?, default_password = ?, url = ?, in_use = ?, is_important = ?, used_by_us = ?, ansible = ?, docker = ?,
+					cpu = ?, ram = ?, disk = ?, extra_disk = ?, ipv4 = ?, ipv6 = ?, vpn = ?, backup = ?, monitored = ?, os_upgrade = ?, app_upgrade = ?, 
+					os = ?, os_version = ?, contact_person = ?, description = ?, updated_at = CURRENT_TIMESTAMP
+				WHERE id = ?`,
+				v.ClusterID, v.Name, v.DefaultPassword, v.URL, v.InUse, v.IsImportant, v.UsedByUs, v.Ansible, v.Docker,
+				v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored, v.OSUpgrade, v.AppUpgrade,
+				v.OS, v.OSVersion, v.ContactPerson, v.Description, existingID,
+			)
+			if err != nil {
+				return 0, 0, err
+			}
+			updated++
+		} else {
+			_, err = tx.Exec(`
+				INSERT INTO vms (
+					cluster_id, name, default_password, url, in_use, is_important, used_by_us, ansible, docker,
+					cpu, ram, disk, extra_disk, ipv4, ipv6, vpn, backup, monitored, os_upgrade, app_upgrade,
+					os, os_version, contact_person, description, updated_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
+				v.ClusterID, v.Name, v.DefaultPassword, v.URL, v.InUse, v.IsImportant, v.UsedByUs, v.Ansible, v.Docker,
+				v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored, v.OSUpgrade, v.AppUpgrade,
+				v.OS, v.OSVersion, v.ContactPerson, v.Description,
+			)
+			if err != nil {
+				return 0, 0, err
+			}
+			inserted++
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, 0, err
+	}
+	return inserted, updated, nil
 }
 
 // --- DNS Records CRUD ---
@@ -535,40 +715,62 @@ func CreateDNSRecord(r *DNSRecord) error {
 }
 
 func UpdateDNSRecord(r *DNSRecord) error {
-	_, err := DB.Exec(
+	res, err := DB.Exec(
 		`UPDATE dns_records SET name=?, type=?, value=?, ttl=?, description=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
 		r.Name, r.Type, r.Value, r.TTL, r.Description, r.ID,
 	)
-	return err
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func DeleteDNSRecord(id int64) error {
-	_, err := DB.Exec(`DELETE FROM dns_records WHERE id = ?`, id)
-	return err
+	res, err := DB.Exec(`DELETE FROM dns_records WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	if n, err := res.RowsAffected(); err == nil && n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
-// BulkUpsertDNSRecords inserts or replaces records (used during zone file import).
+// BulkUpsertDNSRecords inserts or replaces records inside a transaction (used during zone file import).
 // Records with the same (name, type) are updated; new ones are inserted.
 func BulkUpsertDNSRecords(records []DNSRecord) (int, int, error) {
+	tx, err := DB.Begin()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
 	inserted, updated := 0, 0
 	for _, r := range records {
 		var existing int64
-		qErr := DB.QueryRow(`SELECT id FROM dns_records WHERE name = ? AND type = ?`, r.Name, r.Type).Scan(&existing)
+		qErr := tx.QueryRow(`SELECT id FROM dns_records WHERE name = ? AND type = ?`, r.Name, r.Type).Scan(&existing)
 		if qErr == nil {
 			// exists → update value & ttl
-			_, err := DB.Exec(`UPDATE dns_records SET value=?, ttl=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`, r.Value, r.TTL, existing)
-			if err != nil {
-				return inserted, updated, err
+			if _, err := tx.Exec(`UPDATE dns_records SET value=?, ttl=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`, r.Value, r.TTL, existing); err != nil {
+				return 0, 0, err
 			}
 			updated++
 		} else {
 			// new → insert
-			_, err := DB.Exec(`INSERT INTO dns_records (name, type, value, ttl, description, updated_at) VALUES (?, ?, ?, ?, '', CURRENT_TIMESTAMP)`, r.Name, r.Type, r.Value, r.TTL)
-			if err != nil {
-				return inserted, updated, err
+			if _, err := tx.Exec(`INSERT INTO dns_records (name, type, value, ttl, description, updated_at) VALUES (?, ?, ?, ?, '', CURRENT_TIMESTAMP)`, r.Name, r.Type, r.Value, r.TTL); err != nil {
+				return 0, 0, err
 			}
 			inserted++
 		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		return 0, 0, err
 	}
 	return inserted, updated, nil
 }

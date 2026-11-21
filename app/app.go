@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 // Run initializes the application, sets up routes, embeds static files, and starts the HTTP server.
@@ -99,8 +100,17 @@ func Run(staticFS embed.FS) {
 	})
 	mux.Handle("/", noCacheFileServer)
 
+	srv := &http.Server{
+		Addr:              ":" + *port,
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		ReadTimeout:       15 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
+	}
+
 	log.Printf("Starting InfraAtlas server on port %s", *port)
-	if err := http.ListenAndServe(":"+*port, mux); err != nil {
+	if err := srv.ListenAndServe(); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }

@@ -1,7 +1,9 @@
 package app
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
@@ -71,6 +73,10 @@ func handleClusterDetail(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		if err := UpdateCluster(&c); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				respondWithError(w, http.StatusNotFound, "Cluster not found")
+				return
+			}
 			respondWithError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -78,6 +84,10 @@ func handleClusterDetail(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodDelete:
 		if err := DeleteCluster(id); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				respondWithError(w, http.StatusNotFound, "Cluster not found")
+				return
+			}
 			respondWithError(w, http.StatusInternalServerError, err.Error())
 			return
 		}

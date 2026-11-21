@@ -1,5 +1,6 @@
 import { state } from '../state.js';
 import { escapeHTML } from '../utils.js';
+import { apiFetch } from '../api.js';
 
 export function fetchDNSRecords() {
     const searchInput = document.getElementById('dns-search');
@@ -13,8 +14,7 @@ export function fetchDNSRecords() {
 
     const url = '/api/dns' + (queryParams.length ? '?' + queryParams.join('&') : '');
 
-    fetch(url)
-        .then(res => res.json())
+    apiFetch(url)
         .then(data => {
             state.dnsRecords = data || [];
             renderDNSRecords();
@@ -112,10 +112,8 @@ export function renderDNSRecords() {
 }
 
 export function linkDNSToVM(val, hostname) {
-    if (window.switchTab) window.switchTab('vms');
-    window.location.hash = 'vms';
-    
     const searchInput = document.getElementById('vm-search');
     if (searchInput) searchInput.value = val;
-    if (window.fetchVMs) window.fetchVMs();
+    if (window.switchTab) window.switchTab('vms');
+    window.location.hash = 'vms';
 }

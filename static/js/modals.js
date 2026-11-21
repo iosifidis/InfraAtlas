@@ -1,4 +1,5 @@
 import { state } from './state.js';
+import { apiFetch } from './api.js';
 import { escapeHTML, showToast, openFocusTrap, closeFocusTrap } from './utils.js';
 import { fetchClusters, fetchVMs } from './main.js';
 import { fetchDNSRecords } from './views/dns.js';
@@ -11,7 +12,7 @@ export function openClusterModal(id = null) {
     const modal = document.getElementById('cluster-modal');
     const title = document.getElementById('cluster-modal-title');
     const form = document.getElementById('cluster-form');
-    
+
     form.reset();
     document.getElementById('cluster-id').value = '';
 
@@ -46,22 +47,16 @@ export function saveCluster(e) {
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/clusters/${id}` : '/api/clusters';
 
-    fetch(url, {
+    apiFetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     })
-    .then(async res => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Σφάλμα κατά την αποθήκευση');
-        return data;
-    })
-    .then(() => {
-        closeClusterModal();
-        fetchClusters();
-        if (window.fetchStats) window.fetchStats();
-    })
-    .catch(err => showToast(err.message, 'error'));
+        .then(() => {
+            closeClusterModal();
+            fetchClusters();
+            if (window.fetchStats) window.fetchStats();
+        })
+        .catch(err => showToast(err.message, 'error'));
 }
 
 // --- VM Modal ---
@@ -70,10 +65,10 @@ export function openVMModal(id = null) {
     const modal = document.getElementById('vm-modal');
     const title = document.getElementById('vm-modal-title');
     const form = document.getElementById('vm-form');
-    
+
     form.reset();
     document.getElementById('vm-id').value = '';
-    
+
     document.querySelectorAll('.modal-tab-btn').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
     document.querySelector('[data-modaltab="vm-tab-basic"]').classList.add('active');
@@ -83,9 +78,8 @@ export function openVMModal(id = null) {
 
     if (id) {
         title.textContent = 'Επεξεργασία Virtual Machine';
-        
-        fetch(`/api/vms/${id}`)
-            .then(res => res.json())
+
+        apiFetch(`/api/vms/${id}`)
             .then(v => {
                 document.getElementById('vm-id').value = v.id;
                 document.getElementById('vm-cluster-id').value = v.cluster_id;
@@ -94,12 +88,12 @@ export function openVMModal(id = null) {
                 document.getElementById('vm-url').value = v.url || '';
                 document.getElementById('vm-os').value = v.os || '';
                 document.getElementById('vm-os-version').value = v.os_version || '';
-                
+
                 document.getElementById('vm-cpu').value = v.cpu || '';
                 document.getElementById('vm-ram').value = v.ram || '';
                 document.getElementById('vm-disk').value = v.disk || '';
                 document.getElementById('vm-extra-disk').value = v.extra_disk || '';
-                
+
                 document.getElementById('vm-ipv4').value = v.ipv4 || '';
                 document.getElementById('vm-ipv6').value = v.ipv6 || '';
                 document.getElementById('vm-vpn').checked = v.vpn === 1;
@@ -114,14 +108,14 @@ export function openVMModal(id = null) {
                 document.getElementById('vm-monitored').checked = v.monitored === 1;
                 document.getElementById('vm-os-upgrade').checked = v.os_upgrade === 1;
                 document.getElementById('vm-app-upgrade').checked = v.app_upgrade === 1;
-                
+
                 modal.classList.remove('hidden');
                 openFocusTrap(modal.querySelector('.modal-box'), _trigger);
             })
             .catch(err => showToast('Αποτυχία φόρτωσης VM: ' + err.message, 'error'));
     } else {
         title.textContent = 'Καταγραφή Νέου Virtual Machine';
-        
+
         document.getElementById('vm-vpn').checked = false;
         document.getElementById('vm-ansible').checked = false;
         document.getElementById('vm-docker').checked = false;
@@ -132,7 +126,7 @@ export function openVMModal(id = null) {
         if (activeClusterFilter) {
             document.getElementById('vm-cluster-id').value = activeClusterFilter;
         }
-        
+
         modal.classList.remove('hidden');
         openFocusTrap(modal.querySelector('.modal-box'), _trigger);
     }
@@ -146,7 +140,7 @@ export function closeVMModal() {
 export function saveVM(e) {
     if (e) e.preventDefault();
     const id = document.getElementById('vm-id').value;
-    
+
     const clusterIdVal = document.getElementById('vm-cluster-id').value;
     const nameVal = document.getElementById('vm-name').value.trim();
 
@@ -185,12 +179,12 @@ export function saveVM(e) {
         url: document.getElementById('vm-url').value.trim(),
         os: document.getElementById('vm-os').value.trim(),
         os_version: document.getElementById('vm-os-version').value.trim(),
-        
+
         cpu: parseNumber(document.getElementById('vm-cpu').value),
         ram: parseNumber(document.getElementById('vm-ram').value),
         disk: parseNumber(document.getElementById('vm-disk').value),
         extra_disk: parseNumber(document.getElementById('vm-extra-disk').value),
-        
+
         ipv4: document.getElementById('vm-ipv4').value.trim(),
         ipv6: document.getElementById('vm-ipv6').value.trim(),
         backup: document.getElementById('vm-backup').value.trim(),
@@ -210,23 +204,17 @@ export function saveVM(e) {
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/vms/${id}` : '/api/vms';
 
-    fetch(url, {
+    apiFetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     })
-    .then(async res => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Σφάλμα κατά την αποθήκευση');
-        return data;
-    })
-    .then(() => {
-        closeVMModal();
-        showToast('Το VM αποθηκεύτηκε επιτυχώς', 'success');
-        fetchVMs();
-        if (window.fetchStats) window.fetchStats();
-    })
-    .catch(err => showToast(err.message, 'error'));
+        .then(() => {
+            closeVMModal();
+            showToast('Το VM αποθηκεύτηκε επιτυχώς', 'success');
+            fetchVMs();
+            if (window.fetchStats) window.fetchStats();
+        })
+        .catch(err => showToast(err.message, 'error'));
 }
 
 // --- Delete Modal ---
@@ -258,17 +246,12 @@ export function closeDeleteModal() {
 export function confirmDeletion() {
     if (!state.deleteTarget) return;
     const { type, id } = state.deleteTarget;
-    
+
     let url = `/api/vms/${id}`;
     if (type === 'cluster') url = `/api/clusters/${id}`;
     if (type === 'dns') url = `/api/dns/${id}`;
 
-    fetch(url, { method: 'DELETE' })
-        .then(async res => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Σφάλμα κατά τη διαγραφή');
-            return data;
-        })
+    apiFetch(url, { method: 'DELETE' })
         .then(() => {
             closeDeleteModal();
             if (type === 'cluster') fetchClusters();
@@ -289,7 +272,7 @@ export function openDNSModal(id = null) {
     const title = document.getElementById('dns-modal-title');
     const form = document.getElementById('dns-form');
     const bannerContainer = document.getElementById('dns-linked-vm-banner');
-    
+
     form.reset();
     document.getElementById('dns-id').value = '';
     if (bannerContainer) bannerContainer.innerHTML = '';
@@ -304,8 +287,8 @@ export function openDNSModal(id = null) {
             document.getElementById('dns-value').value = record.value;
             document.getElementById('dns-desc').value = record.description || '';
 
-            const linkedVm = (state.vms || []).find(v => 
-                (v.ipv4 && v.ipv4 === record.value) || 
+            const linkedVm = (state.vms || []).find(v =>
+                (v.ipv4 && v.ipv4 === record.value) ||
                 (v.ipv6 && v.ipv6 === record.value) ||
                 (v.url && normalizeHost(v.url) === normalizeHost(record.name)) ||
                 (v.url && normalizeHost(v.url) === normalizeHost(record.value))
@@ -352,21 +335,15 @@ export function saveDNSRecord(e) {
     const method = id ? 'PUT' : 'POST';
     const url = id ? `/api/dns/${id}` : '/api/dns';
 
-    fetch(url, {
+    apiFetch(url, {
         method: method,
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     })
-    .then(async res => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Σφάλμα κατά την αποθήκευση DNS');
-        return data;
-    })
-    .then(() => {
-        closeDNSModal();
-        fetchDNSRecords();
-    })
-    .catch(err => showToast(err.message, 'error'));
+        .then(() => {
+            closeDNSModal();
+            fetchDNSRecords();
+        })
+        .catch(err => showToast(err.message, 'error'));
 }
 
 // --- DNS Import Modal ---
@@ -400,50 +377,50 @@ export function submitDNSImport(e) {
             method: 'POST',
             body: formData
         })
-        .then(async res => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Σφάλμα εισαγωγής αρχείου');
-            return data;
-        })
-        .then(data => {
-            alertBox.className = 'alert alert-success';
-            alertBox.textContent = data.message;
-            alertBox.classList.remove('hidden');
-            setTimeout(() => {
-                closeDNSImportModal();
-                fetchDNSRecords();
-            }, 1200);
-        })
-        .catch(err => {
-            alertBox.className = 'alert alert-danger';
-            alertBox.textContent = err.message;
-            alertBox.classList.remove('hidden');
-        });
+            .then(async res => {
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Σφάλμα εισαγωγής αρχείου');
+                return data;
+            })
+            .then(data => {
+                alertBox.className = 'alert alert-success';
+                alertBox.textContent = data.message;
+                alertBox.classList.remove('hidden');
+                setTimeout(() => {
+                    closeDNSImportModal();
+                    fetchDNSRecords();
+                }, 1200);
+            })
+            .catch(err => {
+                alertBox.className = 'alert alert-danger';
+                alertBox.textContent = err.message;
+                alertBox.classList.remove('hidden');
+            });
     } else if (pasteInput) {
         fetch('/api/dns/import', {
             method: 'POST',
             headers: { 'Content-Type': 'text/plain' },
             body: pasteInput
         })
-        .then(async res => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Σφάλμα εισαγωγής zonefile');
-            return data;
-        })
-        .then(data => {
-            alertBox.className = 'alert alert-success';
-            alertBox.textContent = data.message;
-            alertBox.classList.remove('hidden');
-            setTimeout(() => {
-                closeDNSImportModal();
-                fetchDNSRecords();
-            }, 1200);
-        })
-        .catch(err => {
-            alertBox.className = 'alert alert-danger';
-            alertBox.textContent = err.message;
-            alertBox.classList.remove('hidden');
-        });
+            .then(async res => {
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Σφάλμα εισαγωγής zonefile');
+                return data;
+            })
+            .then(data => {
+                alertBox.className = 'alert alert-success';
+                alertBox.textContent = data.message;
+                alertBox.classList.remove('hidden');
+                setTimeout(() => {
+                    closeDNSImportModal();
+                    fetchDNSRecords();
+                }, 1200);
+            })
+            .catch(err => {
+                alertBox.className = 'alert alert-danger';
+                alertBox.textContent = err.message;
+                alertBox.classList.remove('hidden');
+            });
     } else {
         showToast('Παρακαλώ επιλέξτε αρχείο zonefile ή επικολλήστε περιεχόμενο.', 'error');
     }
@@ -492,20 +469,20 @@ export function submitVMImport(e) {
 
     if (fileInput.files.length > 0) {
         const reader = new FileReader();
-        reader.onload = function(evt) {
+        reader.onload = function (evt) {
             const csvContent = evt.target.result;
             fetch('/api/vms/import', {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/csv' },
                 body: csvContent
             })
-            .then(async res => {
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Σφάλμα εισαγωγής CSV');
-                return data;
-            })
-            .then(handleSuccess)
-            .catch(handleError);
+                .then(async res => {
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.error || 'Σφάλμα εισαγωγής CSV');
+                    return data;
+                })
+                .then(handleSuccess)
+                .catch(handleError);
         };
         reader.readAsText(fileInput.files[0]);
     } else if (pasteInput) {
@@ -514,13 +491,13 @@ export function submitVMImport(e) {
             headers: { 'Content-Type': 'text/csv' },
             body: pasteInput
         })
-        .then(async res => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Σφάλμα εισαγωγής CSV');
-            return data;
-        })
-        .then(handleSuccess)
-        .catch(handleError);
+            .then(async res => {
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Σφάλμα εισαγωγής CSV');
+                return data;
+            })
+            .then(handleSuccess)
+            .catch(handleError);
     } else {
         alertBox.className = 'alert alert-danger';
         alertBox.textContent = 'Παρακαλώ επιλέξτε αρχείο CSV ή επικολλήστε το περιεχόμενο.';
@@ -537,12 +514,7 @@ export function openProfileModal() {
     form.reset();
     alertBox.classList.add('hidden');
 
-    fetch('/api/auth/profile')
-        .then(async res => {
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || 'Σφάλμα ανάκτησης προφίλ');
-            return data;
-        })
+    apiFetch('/api/auth/profile')
         .then(data => {
             document.getElementById('profile-username').value = data.username || 'admin';
             modal.classList.remove('hidden');
@@ -573,48 +545,42 @@ export function submitProfileUpdate(e) {
         return;
     }
 
-    if (newPassword && newPassword.length < 4) {
+    if (newPassword && newPassword.length < 8) {
         alertBox.className = 'alert alert-danger';
-        alertBox.textContent = 'Ο νέος κωδικός πρέπει να έχει τουλάχιστον 4 χαρακτήρες.';
+        alertBox.textContent = 'Ο νέος κωδικός πρέπει να έχει τουλάχιστον 8 χαρακτήρες.';
         alertBox.classList.remove('hidden');
         return;
     }
 
-    fetch('/api/auth/profile', {
+    apiFetch('/api/auth/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
             username: username,
             current_password: currentPassword,
             new_password: newPassword
         })
     })
-    .then(async res => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Σφάλμα ενημέρωσης προφίλ');
-        return data;
-    })
-    .then(data => {
-        alertBox.className = 'alert alert-success';
-        alertBox.textContent = data.message || 'Επιτυχής ενημέρωση!';
-        alertBox.classList.remove('hidden');
+        .then(data => {
+            alertBox.className = 'alert alert-success';
+            alertBox.textContent = data.message || 'Επιτυχής ενημέρωση!';
+            alertBox.classList.remove('hidden');
 
-        const userDisp = document.getElementById('user-display-name');
-        const userChar = document.getElementById('user-avatar-char');
-        if (userDisp && data.username) {
-            userDisp.textContent = data.username;
-        }
-        if (userChar && data.username) {
-            userChar.textContent = data.username.charAt(0).toUpperCase();
-        }
+            const userDisp = document.getElementById('user-display-name');
+            const userChar = document.getElementById('user-avatar-char');
+            if (userDisp && data.username) {
+                userDisp.textContent = data.username;
+            }
+            if (userChar && data.username) {
+                userChar.textContent = data.username.charAt(0).toUpperCase();
+            }
 
-        setTimeout(() => {
-            closeProfileModal();
-        }, 1200);
-    })
-    .catch(err => {
-        alertBox.className = 'alert alert-danger';
-        alertBox.textContent = err.message;
-        alertBox.classList.remove('hidden');
-    });
+            setTimeout(() => {
+                closeProfileModal();
+            }, 1200);
+        })
+        .catch(err => {
+            alertBox.className = 'alert alert-danger';
+            alertBox.textContent = err.message;
+            alertBox.classList.remove('hidden');
+        });
 }

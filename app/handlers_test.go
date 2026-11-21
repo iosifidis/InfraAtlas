@@ -1,9 +1,12 @@
 package app
 
 import (
+	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 )
@@ -217,5 +220,183 @@ func TestAuthMiddleware(t *testing.T) {
 	handler.ServeHTTP(rr3, req3)
 	if rr3.Code != http.StatusOK {
 		t.Errorf("expected status 200 OK for valid session token, got %d", rr3.Code)
+	}
+}
+
+func setupTestDB(t *testing.T) {
+	t.Helper()
+	if err := InitDB(":memory:"); err != nil {
+		t.Fatalf("InitDB(:memory:) failed: %v", err)
+	}
+	t.Cleanup(func() {
+		if DB != nil {
+			_ = DB.Close()
+		}
+	})
+}
+
+func TestRateLimiterCleanup(t *testing.T) {
+	limiter := &rateLimiter{attempts: map[string][]time.Time{
+		"old-ip":   {time.Now().Add(-2 * time.Minute)},
+		"fresh-ip": {time.Now()},
+	}}
+	limiter.cleanup(time.Minute)
+
+	if _, exists := limiter.attempts["old-ip"]; exists {
+		t.Errorf("expected expired IP to be removed by cleanup")
+	}
+	if _, exists := limiter.attempts["fresh-ip"]; !exists {
+		t.Errorf("expected fresh IP to remain after cleanup")
+	}
+}
+
+func TestClusterCRUDHandlers(t *testing.T) {
+	setupTestDB(t)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/clusters", handleClusters)
+	mux.HandleFunc("POST /api/clusters", handleClusters)
+	mux.HandleFunc("GET /api/clusters/{id}", handleClusterDetail)
+	mux.HandleFunc("PUT /api/clusters/{id}", handleClusterDetail)
+	mux.HandleFunc("DELETE /api/clusters/{id}", handleClusterDetail)
+
+	// Create
+	req := httptest.NewRequest("POST", "/api/clusters", strings.NewReader(`{"name":"Cluster-A","description":"Primary"}`))
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusCreated {
+		t.Fatalf("expected 201 Created, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var created Cluster
+	if err := json.Unmarshal(rr.Body.Bytes(), &created); err != nil {
+		t.Fatalf("failed to decode created cluster: %v", err)
+	}
+
+	// Update non-existent -> 404
+	req404 := httptest.NewRequest("PUT", "/api/clusters/9999", strings.NewReader(`{"name":"Missing"}`))
+	rr404 := httptest.NewRecorder()
+	mux.ServeHTTP(rr404, req404)
+	if rr404.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found for missing cluster PUT, got %d", rr404.Code)
+	}
+
+	// Delete created -> 200
+	reqDel := httptest.NewRequest("DELETE", "/api/clusters/1", nil)
+	rrDel := httptest.NewRecorder()
+	mux.ServeHTTP(rrDel, reqDel)
+	if rrDel.Code != http.StatusOK {
+		t.Errorf("expected 200 OK on delete, got %d", rrDel.Code)
+	}
+
+	// Delete again -> 404
+	rrDel2 := httptest.NewRecorder()
+	mux.ServeHTTP(rrDel2, httptest.NewRequest("DELETE", "/api/clusters/1", nil))
+	if rrDel2.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found on second delete, got %d", rrDel2.Code)
+	}
+}
+
+func TestVMCRUDAndFilterHandlers(t *testing.T) {
+	setupTestDB(t)
+
+	c := &Cluster{Name: "Prod"}
+	if err := CreateCluster(c); err != nil {
+		t.Fatalf("CreateCluster failed: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/vms", handleVMs)
+	mux.HandleFunc("POST /api/vms", handleVMs)
+	mux.HandleFunc("PATCH /api/vms/{id}", handleVMDetail)
+	mux.HandleFunc("DELETE /api/vms/{id}", handleVMDetail)
+	mux.HandleFunc("GET /api/export/csv", handleExportCSV)
+
+	body1 := `{"cluster_id":1,"name":"web-01","ansible":1,"docker":0,"cpu":2,"ram":4,"disk":40}`
+	body2 := `{"cluster_id":1,"name":"app-01","ansible":0,"docker":1,"cpu":4,"ram":8,"disk":80}`
+
+	for _, b := range []string{body1, body2} {
+		rr := httptest.NewRecorder()
+		mux.ServeHTTP(rr, httptest.NewRequest("POST", "/api/vms", strings.NewReader(b)))
+		if rr.Code != http.StatusCreated {
+			t.Fatalf("expected 201 Created, got %d: %s", rr.Code, rr.Body.String())
+		}
+	}
+
+	// Filter by ansible=1
+	rrFilter := httptest.NewRecorder()
+	mux.ServeHTTP(rrFilter, httptest.NewRequest("GET", "/api/vms?ansible=1", nil))
+	if rrFilter.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK, got %d", rrFilter.Code)
+	}
+	var filtered []VM
+	if err := json.Unmarshal(rrFilter.Body.Bytes(), &filtered); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if len(filtered) != 1 || filtered[0].Name != "web-01" {
+		t.Errorf("expected only web-01 for ansible=1, got %+v", filtered)
+	}
+
+	// Patch upgrade flags
+	rrPatch := httptest.NewRecorder()
+	mux.ServeHTTP(rrPatch, httptest.NewRequest("PATCH", "/api/vms/1", bytes.NewBufferString(`{"os_upgrade":1}`)))
+	if rrPatch.Code != http.StatusOK {
+		t.Errorf("expected 200 OK on PATCH, got %d", rrPatch.Code)
+	}
+
+	// CSV Export includes new columns
+	rrCSV := httptest.NewRecorder()
+	mux.ServeHTTP(rrCSV, httptest.NewRequest("GET", "/api/export/csv?docker=1", nil))
+	if rrCSV.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK on CSV export, got %d", rrCSV.Code)
+	}
+	csvOut := rrCSV.Body.String()
+	if !strings.Contains(csvOut, "Ansible") || !strings.Contains(csvOut, "app-01") || strings.Contains(csvOut, "web-01") {
+		t.Errorf("unexpected CSV export output: %s", csvOut)
+	}
+
+	// Delete missing -> 404
+	rrDel := httptest.NewRecorder()
+	mux.ServeHTTP(rrDel, httptest.NewRequest("DELETE", "/api/vms/999", nil))
+	if rrDel.Code != http.StatusNotFound {
+		t.Errorf("expected 404 Not Found on missing VM delete, got %d", rrDel.Code)
+	}
+}
+
+func TestDNSImportAndStatsHandlers(t *testing.T) {
+	setupTestDB(t)
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/dns/import", handleDNSImport)
+	mux.HandleFunc("GET /api/dns", handleDNSRecords)
+	mux.HandleFunc("GET /api/stats", handleStats)
+	mux.HandleFunc("POST /api/settings", handleSettings)
+	mux.HandleFunc("GET /api/settings", handleSettings)
+
+	zone := "web 3600 IN A 10.0.0.1\napi IN CNAME web.example.com.\n"
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest("POST", "/api/dns/import", strings.NewReader(zone)))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK on DNS import, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	// Settings round-trip
+	rrSet := httptest.NewRecorder()
+	mux.ServeHTTP(rrSet, httptest.NewRequest("POST", "/api/settings", strings.NewReader(`{"capacity_cpu":"64"}`)))
+	if rrSet.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK on settings POST, got %d", rrSet.Code)
+	}
+
+	rrStats := httptest.NewRecorder()
+	mux.ServeHTTP(rrStats, httptest.NewRequest("GET", "/api/stats", nil))
+	if rrStats.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK on stats GET, got %d", rrStats.Code)
+	}
+	var stats map[string]interface{}
+	if err := json.Unmarshal(rrStats.Body.Bytes(), &stats); err != nil {
+		t.Fatalf("decode stats failed: %v", err)
+	}
+	if stats["total_dns_records"] != float64(2) {
+		t.Errorf("expected total_dns_records=2, got %v", stats["total_dns_records"])
 	}
 }

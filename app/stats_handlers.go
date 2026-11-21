@@ -18,7 +18,7 @@ func handleStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vms, err := GetVMs(0, nil, nil, nil, "")
+	vms, err := GetVMs(VMFilter{})
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, err.Error())
 		return

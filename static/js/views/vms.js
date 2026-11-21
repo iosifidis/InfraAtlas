@@ -1,5 +1,6 @@
 import { state } from '../state.js';
-import { escapeHTML, showToast } from '../utils.js';
+import { escapeHTML, sanitizeURL, showToast } from '../utils.js';
+import { apiFetch } from '../api.js';
 import { renderStatsDashboard } from './dashboard.js';
 
 export function renderVMs() {
@@ -22,7 +23,7 @@ export function renderVMs() {
     let filtered = state.vms || [];
 
     if (search) {
-        filtered = filtered.filter(v => 
+        filtered = filtered.filter(v =>
             (v.name && v.name.toLowerCase().includes(search)) ||
             (v.ipv4 && v.ipv4.toLowerCase().includes(search)) ||
             (v.ipv6 && v.ipv6.toLowerCase().includes(search)) ||
@@ -58,7 +59,7 @@ export function renderVMs() {
             if (e.target.closest('a') || e.target.closest('button')) return;
             window.openVMModal(v.id);
         };
-        
+
         let badgesHtml = '';
         if (v.is_important === 1) badgesHtml += '<span class="badge badge-danger" style="margin-left:4px;">Important</span>';
         if (v.monitored === 1) badgesHtml += '<span class="badge badge-success" style="margin-left:4px;">Monitored</span>';
@@ -74,7 +75,7 @@ export function renderVMs() {
                 <div class="vm-row-flex">
                     <div class="vm-main-details">
                         <div class="vm-name-title">${escapeHTML(v.name)}</div>
-                        <div class="vm-url-sub">${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
+                        <div class="vm-url-sub">${v.url ? `<a href="${escapeHTML(sanitizeURL(v.url))}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
                     </div>
                     <div class="mobile-chevron-icon">
                         <i data-lucide="chevron-right"></i>
@@ -164,7 +165,7 @@ export function renderUpgradesTab() {
                             ${importantBadge}
                         </div>
                         <div class="vm-url-sub">
-                            ${v.url ? `<a href="${escapeHTML(v.url)}" target="_blank" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}
+                            ${v.url ? `<a href="${escapeHTML(sanitizeURL(v.url))}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}
                         </div>
                         <div class="mobile-only-sub" style="font-size:0.75rem; color:var(--text-secondary); margin-top:2px;">
                             ${escapeHTML(v.cluster_name)} ${v.ipv4 ? ' | <code>' + escapeHTML(v.ipv4) + '</code>' : ''}
@@ -217,26 +218,22 @@ export function toggleVMUpgrade(vmId, field, isChecked) {
     const patch = {};
     patch[field] = newVal;
 
-    fetch(`/api/vms/${vmId}`, {
+    apiFetch(`/api/vms/${vmId}`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(patch)
     })
-    .then(async res => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Σφάλμα κατά την ενημέρωση');
-        
-        vm.os_upgrade = Number(data.os_upgrade);
-        vm.app_upgrade = Number(data.app_upgrade);
+        .then(data => {
+            vm.os_upgrade = Number(data.os_upgrade);
+            vm.app_upgrade = Number(data.app_upgrade);
 
-        renderUpgradesTab();
-        if (typeof renderStatsDashboard === 'function') renderStatsDashboard();
-        if (typeof renderVMs === 'function') renderVMs();
-        showToast('Η κατάσταση αναβάθμισης ενημερώθηκε επιτυχώς', 'success');
-        if (window.fetchStats) window.fetchStats();
-    })
-    .catch(err => {
-        renderUpgradesTab();
-        showToast(err.message || 'Αποτυχία ενημέρωσης στη βάση', 'error');
-    });
+            renderUpgradesTab();
+            if (typeof renderStatsDashboard === 'function') renderStatsDashboard();
+            if (typeof renderVMs === 'function') renderVMs();
+            showToast('Η κατάσταση αναβάθμισης ενημερώθηκε επιτυχώς', 'success');
+            if (window.fetchStats) window.fetchStats();
+        })
+        .catch(err => {
+            renderUpgradesTab();
+            showToast(err.message || 'Αποτυχία ενημέρωσης στη βάση', 'error');
+        });
 }

@@ -83,17 +83,25 @@ docker compose up --build -d
 
 ```text
 InfraAtlas/
-├── main.go               # Σημείο εισόδου & δρομολόγηση HTTP routes
-├── handlers.go           # Handlers για API endpoints (Auth, Clusters, VMs, DNS, CSV, Settings)
-├── db.go                 # Σχήμα SQLite & CRUD λειτουργίες βάσης
-├── Dockerfile            # Multi-stage Docker build file
-├── docker-compose.yml    # Docker Compose configuration με bind volume & project name
-├── go.mod / go.sum       # Εξαρτήσεις Go modules
-├── static/               # Frontend Assets
-│   ├── index.html        # SPA Main Interface
-│   ├── style.css         # Custom Glassmorphic Dark Design System
-│   └── app.js            # Frontend Logic Controller & Report Generator
-└── data/                 # SQLite Database Volume (/app/data/dashboard.db)
+├── main.go                     # Σημείο εισόδου & static embed
+├── app/
+│   ├── app.go                  # Δρομολόγηση HTTP routes & server setup
+│   ├── db.go                   # Σχήμα SQLite, migrations & CRUD
+│   ├── auth_handlers.go        # Αυθεντικοποίηση, sessions, rate limiter & middleware
+│   ├── cluster_handlers.go     # CRUD για Clusters
+│   ├── vm_handlers.go          # CRUD για VMs, CSV import/export
+│   ├── dns_handlers.go         # CRUD για DNS & BIND zonefile parser
+│   ├── stats_handlers.go       # Στατιστικά & ρυθμίσεις
+│   ├── helpers.go              # Βοηθητικές συναρτήσεις JSON/σφαλμάτων
+│   └── handlers_test.go        # Unit & integration tests
+├── Dockerfile                  # Multi-stage Docker build file
+├── docker-compose.yml          # Docker Compose configuration με bind volume & project name
+├── go.mod / go.sum             # Εξαρτήσεις Go modules
+├── static/                     # Frontend Assets
+│   ├── index.html              # SPA Main Interface
+│   ├── style.css               # Custom Glassmorphic Dark Design System
+│   └── js/                     # Native ES Modules (main.js, api.js, state.js, utils.js, modals.js, views/)
+└── data/                       # SQLite Database Volume (/app/data/dashboard.db)
 ```
 
 ---

@@ -2,7 +2,9 @@ package app
 
 import (
 	"bufio"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -92,6 +94,10 @@ func handleDNSRecordDetail(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := UpdateDNSRecord(&rec); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				respondWithError(w, http.StatusNotFound, "DNS Record not found")
+				return
+			}
 			respondWithError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -99,6 +105,10 @@ func handleDNSRecordDetail(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodDelete:
 		if err := DeleteDNSRecord(id); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				respondWithError(w, http.StatusNotFound, "DNS Record not found")
+				return
+			}
 			respondWithError(w, http.StatusInternalServerError, err.Error())
 			return
 		}
@@ -115,6 +125,8 @@ func handleDNSImport(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
+
+	r.Body = http.MaxBytesReader(w, r.Body, 10<<20) // 10 MB limit
 
 	var content string
 

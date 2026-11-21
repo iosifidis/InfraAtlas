@@ -63,6 +63,26 @@ func (rl *rateLimiter) isAllowed(ip string, maxAttempts int, window time.Duratio
 	return true
 }
 
+func (rl *rateLimiter) cleanup(window time.Duration) {
+	rl.Lock()
+	defer rl.Unlock()
+
+	cutoff := time.Now().Add(-window)
+	for ip, timestamps := range rl.attempts {
+		var valid []time.Time
+		for _, t := range timestamps {
+			if t.After(cutoff) {
+				valid = append(valid, t)
+			}
+		}
+		if len(valid) == 0 {
+			delete(rl.attempts, ip)
+		} else {
+			rl.attempts[ip] = valid
+		}
+	}
+}
+
 func getClientIP(r *http.Request) string {
 	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 		parts := strings.Split(xff, ",")
@@ -93,7 +113,7 @@ func generateToken() (string, error) {
 	return base64.URLEncoding.EncodeToString(b), nil
 }
 
-// startSessionCleanup purges expired sessions once per hour.
+// startSessionCleanup purges expired sessions and stale rate-limiter entries once per hour.
 func startSessionCleanup() {
 	go func() {
 		ticker := time.NewTicker(time.Hour)
@@ -107,8 +127,21 @@ func startSessionCleanup() {
 				}
 			}
 			sessions.Unlock()
+			authRateLimiter.cleanup(time.Minute)
 		}
 	}()
+}
+
+func setSessionCookie(w http.ResponseWriter, r *http.Request, token string) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    token,
+		Expires:  time.Now().Add(sessionDuration),
+		HttpOnly: true,
+		Secure:   isSecureRequest(r),
+		Path:     "/",
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 // Middleware to check authentication
@@ -253,15 +286,7 @@ func handleAuthSetup(w http.ResponseWriter, r *http.Request) {
 	sessions.m[token] = sessionData{username: req.Username, expiresAt: time.Now().Add(sessionDuration)}
 	sessions.Unlock()
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    token,
-		Expires:  time.Now().Add(24 * time.Hour),
-		HttpOnly: true,
-		Secure:   isSecureRequest(r),
-		Path:     "/",
-		SameSite: http.SameSiteLaxMode,
-	})
+	setSessionCookie(w, r, token)
 
 	respondWithJSON(w, http.StatusOK, map[string]string{"message": "Setup successful"})
 }
@@ -306,15 +331,7 @@ func handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	sessions.m[token] = sessionData{username: u.Username, expiresAt: time.Now().Add(sessionDuration)}
 	sessions.Unlock()
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     sessionCookieName,
-		Value:    token,
-		Expires:  time.Now().Add(24 * time.Hour),
-		HttpOnly: true,
-		Secure:   isSecureRequest(r),
-		Path:     "/",
-		SameSite: http.SameSiteLaxMode,
-	})
+	setSessionCookie(w, r, token)
 
 	respondWithJSON(w, http.StatusOK, map[string]string{"message": "Login successful"})
 }
@@ -338,6 +355,7 @@ func handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 		Value:    "",
 		Expires:  time.Unix(0, 0),
 		HttpOnly: true,
+		Secure:   isSecureRequest(r),
 		Path:     "/",
 		SameSite: http.SameSiteLaxMode,
 	})

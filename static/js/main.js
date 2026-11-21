@@ -1,4 +1,5 @@
 import { state, defaultFields } from './state.js';
+import { apiFetch, setUnauthorizedHandler } from './api.js';
 import { escapeHTML, debounce, togglePasswordVisibility, showAlert, showToast } from './utils.js';
 import { renderStatsDashboard, renderClusters, populateClusterDropdowns } from './views/dashboard.js';
 import { renderVMs, renderUpgradesTab, toggleVMUpgrade } from './views/vms.js';
@@ -22,9 +23,9 @@ export function checkAuthStatus() {
         .then(data => {
             state.setupCompleted = data.setup_completed;
             state.loggedIn = data.logged_in;
-            
+
             updateAuthUI();
-            
+
             if (state.loggedIn) {
                 initializeDashboard();
             }
@@ -61,7 +62,7 @@ export function updateAuthUI() {
     } else {
         overlay.classList.add('hidden');
         appContainer.classList.remove('hidden');
-        
+
         const username = document.getElementById('auth-username').value || 'Admin';
         document.getElementById('user-display-name').textContent = username;
         document.getElementById('user-avatar-char').textContent = username.substring(0, 1).toUpperCase();
@@ -69,22 +70,16 @@ export function updateAuthUI() {
 }
 
 export function sendAuthRequest(url, payload) {
-    fetch(url, {
+    apiFetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     })
-    .then(async res => {
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || 'Σφάλμα σύνδεσης');
-        return data;
-    })
-    .then(() => {
-        checkAuthStatus();
-    })
-    .catch(err => {
-        showAlert(err.message);
-    });
+        .then(() => {
+            checkAuthStatus();
+        })
+        .catch(err => {
+            showAlert(err.message);
+        });
 }
 
 // --- App Initialization & Tab Navigation ---
@@ -94,16 +89,16 @@ export function initializeDashboard() {
     if (!['dashboard', 'clusters', 'vms', 'dns', 'upgrades', 'reports', 'settings'].includes(hash)) {
         hash = 'dashboard';
     }
-    
+
     switchTab(hash);
-    
+
     loadUserProfile();
     fetchSettings();
     fetchStats();
     fetchClusters();
     fetchVMs();
     fetchDNSRecords();
-    
+
     setInterval(fetchStats, 60000);
 }
 
@@ -130,7 +125,7 @@ export function closeMobileSidebar() {
 export function switchTab(tabId) {
     state.activeTab = tabId;
     closeMobileSidebar();
-    
+
     document.querySelectorAll('.menu-item').forEach(item => {
         if (item.getAttribute('data-tab') === tabId) {
             item.classList.add('active');
@@ -149,7 +144,7 @@ export function switchTab(tabId) {
 
     const pageTitle = document.getElementById('page-title');
     const pageDesc = document.getElementById('page-description');
-    
+
     switch (tabId) {
         case 'dashboard':
             pageTitle.textContent = 'Dashboard';
@@ -192,8 +187,7 @@ export function switchTab(tabId) {
 // --- Data Fetching APIs ---
 
 export function fetchSettings() {
-    fetch('/api/settings')
-        .then(res => res.json())
+    apiFetch('/api/settings')
         .then(data => {
             state.settings = data;
             applySettingsToUI();
@@ -202,8 +196,7 @@ export function fetchSettings() {
 }
 
 export function fetchStats() {
-    fetch('/api/stats')
-        .then(res => res.json())
+    apiFetch('/api/stats')
         .then(data => {
             state.stats = data;
             renderStatsDashboard();
@@ -212,8 +205,7 @@ export function fetchStats() {
 }
 
 export function fetchClusters() {
-    fetch('/api/clusters')
-        .then(res => res.json())
+    apiFetch('/api/clusters')
         .then(data => {
             state.clusters = data || [];
             renderClusters();
@@ -223,8 +215,7 @@ export function fetchClusters() {
 }
 
 export function fetchVMs() {
-    return fetch('/api/vms?t=' + Date.now())
-        .then(res => res.json())
+    return apiFetch('/api/vms?t=' + Date.now())
         .then(data => {
             state.vms = data || [];
             state.vmsLoaded = true;
@@ -274,7 +265,7 @@ export function applySettingsToUI() {
 export function saveSettings(e) {
     if (e) e.preventDefault();
     const payload = {};
-    
+
     const capCpu = document.getElementById('setting-capacity_cpu');
     const capRam = document.getElementById('setting-capacity_ram');
     const capDisk = document.getElementById('setting-capacity_disk');
@@ -292,24 +283,21 @@ export function saveSettings(e) {
         }
     });
 
-    fetch('/api/settings', {
+    apiFetch('/api/settings', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
     })
-    .then(res => res.json())
-    .then(() => {
-        state.settings = payload;
-        applySettingsToUI();
-        fetchStats();
-        showToast('Οι ρυθμίσεις αποθηκεύτηκαν με επιτυχία!', 'success');
-    })
-    .catch(err => showToast('Αποτυχία αποθήκευσης ρυθμίσεων: ' + err.message, 'error'));
+        .then(() => {
+            state.settings = payload;
+            applySettingsToUI();
+            fetchStats();
+            showToast('Οι ρυθμίσεις αποθηκεύτηκαν με επιτυχία!', 'success');
+        })
+        .catch(err => showToast('Αποτυχία αποθήκευσης ρυθμίσεων: ' + err.message, 'error'));
 }
 
 export function loadUserProfile() {
-    fetch('/api/auth/profile')
-        .then(res => res.ok ? res.json() : null)
+    apiFetch('/api/auth/profile')
         .then(data => {
             if (data && data.username) {
                 const userDisp = document.getElementById('user-display-name');
@@ -372,7 +360,7 @@ export function setupEventListeners() {
             const username = document.getElementById('auth-username').value.trim();
             const password = document.getElementById('auth-password').value;
             const alertBox = document.getElementById('auth-alert');
-            
+
             alertBox.classList.add('hidden');
 
             if (!state.setupCompleted) {
@@ -392,7 +380,7 @@ export function setupEventListeners() {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.modal-tab-btn').forEach(b => b.classList.remove('active'));
             document.querySelectorAll('.modal-tab-content').forEach(c => c.classList.remove('active'));
-            
+
             btn.classList.add('active');
             const contentId = btn.getAttribute('data-modaltab');
             document.getElementById(contentId).classList.add('active');
@@ -406,7 +394,7 @@ export function setupEventListeners() {
 
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'Escape') return;
-        
+
         const sidebar = document.getElementById('sidebar');
         if (sidebar && sidebar.classList.contains('mobile-open')) {
             closeMobileSidebar();
@@ -416,17 +404,17 @@ export function setupEventListeners() {
         const openModal = document.querySelector('.modal-overlay:not(.hidden)');
         if (!openModal) return;
         const id = openModal.id;
-        if (id === 'cluster-modal')    closeClusterModal();
-        else if (id === 'vm-modal')    closeVMModal();
-        else if (id === 'dns-modal')   closeDNSModal();
+        if (id === 'cluster-modal') closeClusterModal();
+        else if (id === 'vm-modal') closeVMModal();
+        else if (id === 'dns-modal') closeDNSModal();
         else if (id === 'dns-import-modal') closeDNSImportModal();
-        else if (id === 'vm-import-modal')  closeVMImportModal();
-        else if (id === 'profile-modal')    closeProfileModal();
-        else if (id === 'delete-modal')     closeDeleteModal();
+        else if (id === 'vm-import-modal') closeVMImportModal();
+        else if (id === 'profile-modal') closeProfileModal();
+        else if (id === 'delete-modal') closeDeleteModal();
     });
 
     const debouncedRenderVMs = debounce(renderVMs, 150);
-    const debouncedFetchDNS  = debounce(fetchDNSRecords, 300);
+    const debouncedFetchDNS = debounce(fetchDNSRecords, 300);
     const vmSearch = document.getElementById('vm-search');
     const dnsSearch = document.getElementById('dns-search');
     if (vmSearch) vmSearch.addEventListener('input', debouncedRenderVMs);
@@ -451,6 +439,13 @@ Object.assign(window, {
 
 // App Startup on DOMContentLoaded
 document.addEventListener('DOMContentLoaded', () => {
+    setUnauthorizedHandler(() => {
+        if (state.loggedIn) {
+            state.loggedIn = false;
+            updateAuthUI();
+            showToast('Η συνεδρία σας έληξε. Παρακαλώ συνδεθείτε ξανά.', 'info');
+        }
+    });
     checkAuthStatus();
     setupEventListeners();
 });
