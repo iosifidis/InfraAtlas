@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -26,35 +27,6 @@ func TestBoolToGreek(t *testing.T) {
 		result := boolToGreek(tt.input)
 		if result != tt.expected {
 			t.Errorf("boolToGreek(%d) = %q; want %q", tt.input, result, tt.expected)
-		}
-	}
-}
-
-func TestParseBoolInt(t *testing.T) {
-	tests := []struct {
-		input    string
-		expected int
-	}{
-		{"1", 1},
-		{"true", 1},
-		{"TRUE", 1},
-		{"yes", 1},
-		{"YES", 1},
-		{"nai", 1},
-		{"ναι", 1},
-		{"Client Configured", 1},
-		{"VPN active", 1},
-		{"0", 0},
-		{"false", 0},
-		{"no", 0},
-		{"oxi", 0},
-		{"", 0},
-	}
-
-	for _, tt := range tests {
-		result := parseBoolInt(tt.input)
-		if result != tt.expected {
-			t.Errorf("parseBoolInt(%q) = %d; want %d", tt.input, result, tt.expected)
 		}
 	}
 }
@@ -87,55 +59,6 @@ blog            IN      CNAME   web.example.com.
 	// Record 3: blog
 	if records[2].Name != "blog" || records[2].Type != "CNAME" || records[2].Value != "web.example.com" {
 		t.Errorf("unexpected record 2: %+v", records[2])
-	}
-}
-
-func TestParseVMCSV(t *testing.T) {
-	csvData := `ONOMA,URL,SE XRISI,IMPORTANCE,EMPTY,CPU,RAM,DISK,EXTRA DISK,IPV4,IPV6,VPN,BACKUP,MONITOR,OS,OS VER,EMPTY2,CLUSTER,CONTACT,DESC
-Thiseas
-vm1.example.com,https://vm1.com,ΝΑΙ,HIGH,,4,8,100,50+25,192.168.1.5,fe80::1,YES,Daily,OXI,Ubuntu,22.04,,Thiseas Cluster,John Doe,Main VM
-vm2.example.com,https://vm2.com,OXI,LOW,,2,4,50,0,192.168.1.6,,OXI,None,OXI,Debian,12,,General Cluster,Jane Doe,Backup VM
-`
-	items, err := parseVMCSV(csvData)
-	if err != nil {
-		t.Fatalf("parseVMCSV returned unexpected error: %v", err)
-	}
-
-	if len(items) != 2 {
-		t.Fatalf("expected 2 parsed VM items, got %d", len(items))
-	}
-
-	// VM 1
-	item1 := items[0]
-	if item1.vm.Name != "vm1.example.com" {
-		t.Errorf("expected VM name 'vm1.example.com', got %q", item1.vm.Name)
-	}
-	if item1.clusterName != "Thiseas Cluster" {
-		t.Errorf("expected cluster name 'Thiseas Cluster', got %q", item1.clusterName)
-	}
-	if item1.vm.InUse != 1 {
-		t.Errorf("expected InUse=1, got %d", item1.vm.InUse)
-	}
-	if item1.vm.IsImportant != 1 {
-		t.Errorf("expected IsImportant=1, got %d", item1.vm.IsImportant)
-	}
-	if item1.vm.CPU != 4 || item1.vm.RAM != 8 || item1.vm.Disk != 100 {
-		t.Errorf("unexpected specs for VM1: CPU=%.1f, RAM=%.1f, Disk=%.1f", item1.vm.CPU, item1.vm.RAM, item1.vm.Disk)
-	}
-	if item1.vm.ExtraDisk != 75 { // 50+25
-		t.Errorf("expected ExtraDisk=75 (50+25), got %.1f", item1.vm.ExtraDisk)
-	}
-	if item1.vm.VPN != 1 {
-		t.Errorf("expected VPN=1, got %d", item1.vm.VPN)
-	}
-
-	// VM 2
-	item2 := items[1]
-	if item2.vm.Name != "vm2.example.com" {
-		t.Errorf("expected VM name 'vm2.example.com', got %q", item2.vm.Name)
-	}
-	if item2.vm.InUse != 0 {
-		t.Errorf("expected InUse=0, got %d", item2.vm.InUse)
 	}
 }
 
@@ -398,5 +321,71 @@ func TestDNSImportAndStatsHandlers(t *testing.T) {
 	}
 	if stats["total_dns_records"] != float64(2) {
 		t.Errorf("expected total_dns_records=2, got %v", stats["total_dns_records"])
+	}
+}
+
+func TestVMSoftwareAndSearch(t *testing.T) {
+	setupTestDB(t)
+
+	c := &Cluster{Name: "WebCluster"}
+	if err := CreateCluster(c); err != nil {
+		t.Fatalf("CreateCluster failed: %v", err)
+	}
+
+	v := &VM{
+		ClusterID: c.ID,
+		Name:      "portal-vm",
+		Software: []VMSoftware{
+			{Name: "nginx", Version: "1.24.0"},
+			{Name: "php", Version: "8.2"},
+			{Name: "wordpress", Version: "6.7"},
+		},
+	}
+	if err := CreateVM(v); err != nil {
+		t.Fatalf("CreateVM failed: %v", err)
+	}
+
+	loaded, err := GetVM(v.ID)
+	if err != nil {
+		t.Fatalf("GetVM failed: %v", err)
+	}
+	if len(loaded.Software) != 3 {
+		t.Fatalf("expected 3 software items, got %d", len(loaded.Software))
+	}
+
+	// Search by software name
+	found, err := GetVMs(VMFilter{Search: "wordpress"})
+	if err != nil {
+		t.Fatalf("GetVMs search failed: %v", err)
+	}
+	if len(found) != 1 || found[0].Name != "portal-vm" {
+		t.Errorf("expected portal-vm when searching for wordpress, got %+v", found)
+	}
+
+	// Update software list
+	loaded.Software = []VMSoftware{{Name: "matrix", Version: "1.118"}}
+	if err := UpdateVM(&loaded); err != nil {
+		t.Fatalf("UpdateVM failed: %v", err)
+	}
+	reloaded, err := GetVM(v.ID)
+	if err != nil {
+		t.Fatalf("GetVM after update failed: %v", err)
+	}
+	if len(reloaded.Software) != 1 || reloaded.Software[0].Name != "matrix" {
+		t.Errorf("expected updated software [matrix], got %+v", reloaded.Software)
+	}
+}
+
+func TestBackupValidation(t *testing.T) {
+	badFile, err := os.CreateTemp("", "bad-backup-*.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove(badFile.Name())
+	_, _ = badFile.WriteString("not a sqlite file")
+	_ = badFile.Close()
+
+	if err := validateSQLiteBackup(badFile.Name()); err == nil {
+		t.Errorf("expected validateSQLiteBackup to fail for non-sqlite file")
 	}
 }

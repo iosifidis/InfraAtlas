@@ -9,7 +9,10 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-var DB *sql.DB
+var (
+	DB            *sql.DB
+	currentDBPath string
+)
 
 // Models
 type Cluster struct {
@@ -46,10 +49,19 @@ type VM struct {
 	AppUpgrade      int       `json:"app_upgrade"` // 0 or 1
 	OS              string    `json:"os"`
 	OSVersion       string    `json:"os_version"`
-	ContactPerson   string    `json:"contact_person"`
-	Description     string    `json:"description"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	ContactPerson   string       `json:"contact_person"`
+	Description     string       `json:"description"`
+	Software        []VMSoftware `json:"software"`
+	CreatedAt       time.Time    `json:"created_at"`
+	UpdatedAt       time.Time    `json:"updated_at"`
+}
+
+type VMSoftware struct {
+	ID      int64  `json:"id"`
+	VMID    int64  `json:"vm_id"`
+	Name    string `json:"name"`
+	Version string `json:"version"`
+	Notes   string `json:"notes,omitempty"`
 }
 
 type User struct {
@@ -73,6 +85,7 @@ type DNSRecord struct {
 // InitDB opens the database and runs migrations
 func InitDB(dbPath string) error {
 	var err error
+	currentDBPath = dbPath
 	DB, err = sql.Open("sqlite", dbPath)
 	if err != nil {
 		return fmt.Errorf("failed to open database: %w", err)
@@ -161,6 +174,16 @@ func migrate() error {
 		`CREATE INDEX IF NOT EXISTS idx_vms_in_use ON vms(in_use);`,
 		`CREATE INDEX IF NOT EXISTS idx_vms_is_important ON vms(is_important);`,
 		`CREATE INDEX IF NOT EXISTS idx_vms_ipv4 ON vms(ipv4);`,
+		`CREATE TABLE IF NOT EXISTS vm_software (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			vm_id INTEGER NOT NULL,
+			name TEXT NOT NULL,
+			version TEXT NOT NULL DEFAULT '',
+			notes TEXT DEFAULT '',
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			FOREIGN KEY (vm_id) REFERENCES vms(id) ON DELETE CASCADE
+		);`,
+		`CREATE INDEX IF NOT EXISTS idx_vm_software_vm_id ON vm_software(vm_id);`,
 	}
 
 	for _, q := range schema {
@@ -345,27 +368,6 @@ func DeleteCluster(id int64) error {
 	return nil
 }
 
-func GetOrCreateClusterByName(name string) (int64, error) {
-	name = strings.TrimSpace(name)
-	if name == "" {
-		name = "General Cluster"
-	}
-	var id int64
-	err := DB.QueryRow("SELECT id FROM clusters WHERE LOWER(name) = LOWER(?)", name).Scan(&id)
-	if err == nil {
-		return id, nil
-	}
-	c := &Cluster{
-		Name:        name,
-		Description: "Αυτόματα δημιουργημένο σύμπλεγμα από εισαγωγή CSV",
-	}
-	err = CreateCluster(c)
-	if err != nil {
-		return 0, err
-	}
-	return c.ID, nil
-}
-
 // --- VMs CRUD ---
 
 // VMFilter specifies optional filters for querying VMs.
@@ -442,9 +444,10 @@ func GetVMs(f VMFilter) ([]VM, error) {
 		args = append(args, *f.Docker)
 	}
 	if f.Search != "" {
-		query += " AND (v.name LIKE ? OR v.ipv4 LIKE ? OR v.ipv6 LIKE ? OR v.url LIKE ? OR v.os LIKE ? OR v.contact_person LIKE ? OR v.description LIKE ?)"
+		query += ` AND (v.name LIKE ? OR v.ipv4 LIKE ? OR v.ipv6 LIKE ? OR v.url LIKE ? OR v.os LIKE ? OR v.contact_person LIKE ? OR v.description LIKE ?
+			OR EXISTS (SELECT 1 FROM vm_software s WHERE s.vm_id = v.id AND (s.name LIKE ? OR s.version LIKE ?)))`
 		likePattern := "%" + f.Search + "%"
-		args = append(args, likePattern, likePattern, likePattern, likePattern, likePattern, likePattern, likePattern)
+		args = append(args, likePattern, likePattern, likePattern, likePattern, likePattern, likePattern, likePattern, likePattern, likePattern)
 	}
 
 	query += " ORDER BY v.name ASC"
@@ -461,30 +464,106 @@ func GetVMs(f VMFilter) ([]VM, error) {
 		if err != nil {
 			return nil, err
 		}
+		v.Software = []VMSoftware{}
 		vms = append(vms, v)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err
 	}
+
+	if len(vms) > 0 {
+		swMap, err := getAllVMSoftware()
+		if err != nil {
+			return nil, err
+		}
+		for i := range vms {
+			if items, ok := swMap[vms[i].ID]; ok {
+				vms[i].Software = items
+			}
+		}
+	}
 	return vms, nil
 }
 
-func parseBoolInt(s string) int {
-	s = strings.TrimSpace(s)
-	if s == "1" || strings.EqualFold(s, "true") || strings.EqualFold(s, "yes") || strings.EqualFold(s, "nai") || strings.EqualFold(s, "ναι") {
-		return 1
+func getAllVMSoftware() (map[int64][]VMSoftware, error) {
+	rows, err := DB.Query(`SELECT id, vm_id, name, version, notes FROM vm_software ORDER BY name ASC, id ASC`)
+	if err != nil {
+		return nil, err
 	}
-	if strings.Contains(s, "Client Configured") || strings.Contains(s, "VPN") {
-		return 1
+	defer rows.Close()
+
+	result := make(map[int64][]VMSoftware)
+	for rows.Next() {
+		var s VMSoftware
+		var notes sql.NullString
+		if err := rows.Scan(&s.ID, &s.VMID, &s.Name, &s.Version, &notes); err != nil {
+			return nil, err
+		}
+		s.Notes = notes.String
+		result[s.VMID] = append(result[s.VMID], s)
 	}
-	return 0
+	return result, rows.Err()
+}
+
+func getVMSoftware(vmID int64) ([]VMSoftware, error) {
+	rows, err := DB.Query(`SELECT id, vm_id, name, version, notes FROM vm_software WHERE vm_id = ? ORDER BY name ASC, id ASC`, vmID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	items := []VMSoftware{}
+	for rows.Next() {
+		var s VMSoftware
+		var notes sql.NullString
+		if err := rows.Scan(&s.ID, &s.VMID, &s.Name, &s.Version, &notes); err != nil {
+			return nil, err
+		}
+		s.Notes = notes.String
+		items = append(items, s)
+	}
+	return items, rows.Err()
 }
 
 func GetVM(id int64) (VM, error) {
-	return scanVM(DB.QueryRow(vmSelectColumns+" WHERE v.id = ?", id))
+	v, err := scanVM(DB.QueryRow(vmSelectColumns+" WHERE v.id = ?", id))
+	if err != nil {
+		return v, err
+	}
+	sw, err := getVMSoftware(id)
+	if err != nil {
+		return v, err
+	}
+	v.Software = sw
+	return v, nil
+}
+
+func replaceVMSoftwareTx(tx *sql.Tx, vmID int64, items []VMSoftware) error {
+	if _, err := tx.Exec(`DELETE FROM vm_software WHERE vm_id = ?`, vmID); err != nil {
+		return err
+	}
+	for _, s := range items {
+		name := strings.TrimSpace(s.Name)
+		if name == "" {
+			continue
+		}
+		if _, err := tx.Exec(
+			`INSERT INTO vm_software (vm_id, name, version, notes) VALUES (?, ?, ?, ?)`,
+			vmID, name, strings.TrimSpace(s.Version), strings.TrimSpace(s.Notes),
+		); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func CreateVM(v *VM) error {
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	query := `
 		INSERT INTO vms (
 			cluster_id, name, default_password, url, in_use, is_important, used_by_us, ansible, docker,
@@ -492,7 +571,7 @@ func CreateVM(v *VM) error {
 			os, os_version, contact_person, description, updated_at
 		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`
-	res, err := DB.Exec(query,
+	res, err := tx.Exec(query,
 		v.ClusterID, v.Name, v.DefaultPassword, v.URL, v.InUse, v.IsImportant, v.UsedByUs, v.Ansible, v.Docker,
 		v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored, v.OSUpgrade, v.AppUpgrade,
 		v.OS, v.OSVersion, v.ContactPerson, v.Description,
@@ -501,10 +580,22 @@ func CreateVM(v *VM) error {
 		return err
 	}
 	v.ID, err = res.LastInsertId()
-	return err
+	if err != nil {
+		return err
+	}
+	if err := replaceVMSoftwareTx(tx, v.ID, v.Software); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func UpdateVM(v *VM) error {
+	tx, err := DB.Begin()
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
 	query := `
 		UPDATE vms SET 
 			cluster_id = ?, name = ?, default_password = ?, url = ?, in_use = ?, is_important = ?, used_by_us = ?, ansible = ?, docker = ?,
@@ -512,7 +603,7 @@ func UpdateVM(v *VM) error {
 			os = ?, os_version = ?, contact_person = ?, description = ?, updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
-	res, err := DB.Exec(query,
+	res, err := tx.Exec(query,
 		v.ClusterID, v.Name, v.DefaultPassword, v.URL, v.InUse, v.IsImportant, v.UsedByUs, v.Ansible, v.Docker,
 		v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored, v.OSUpgrade, v.AppUpgrade,
 		v.OS, v.OSVersion, v.ContactPerson, v.Description, v.ID,
@@ -523,27 +614,10 @@ func UpdateVM(v *VM) error {
 	if n, err := res.RowsAffected(); err == nil && n == 0 {
 		return sql.ErrNoRows
 	}
-	return nil
-}
-
-func UpsertVMByName(v *VM) (created bool, err error) {
-	var existingID int64
-	err = DB.QueryRow("SELECT id FROM vms WHERE cluster_id = ? AND LOWER(name) = LOWER(?)", v.ClusterID, strings.ToLower(v.Name)).Scan(&existingID)
-	if err == nil {
-		v.ID = existingID
-		err = UpdateVM(v)
-		return false, err
+	if err := replaceVMSoftwareTx(tx, v.ID, v.Software); err != nil {
+		return err
 	}
-
-	err = DB.QueryRow("SELECT id FROM vms WHERE LOWER(name) = LOWER(?)", strings.ToLower(v.Name)).Scan(&existingID)
-	if err == nil {
-		v.ID = existingID
-		err = UpdateVM(v)
-		return false, err
-	}
-
-	err = CreateVM(v)
-	return true, err
+	return tx.Commit()
 }
 
 func PatchVMUpgradeFlags(id int64, osUpgrade int, appUpgrade int) error {
@@ -562,93 +636,6 @@ func DeleteVM(id int64) error {
 		return sql.ErrNoRows
 	}
 	return nil
-}
-
-// BulkUpsertVMs runs VM CSV import inside a single SQLite transaction.
-func BulkUpsertVMs(items []parsedVMItem) (int, int, error) {
-	tx, err := DB.Begin()
-	if err != nil {
-		return 0, 0, err
-	}
-	defer func() {
-		_ = tx.Rollback()
-	}()
-
-	inserted, updated := 0, 0
-	clusterCache := make(map[string]int64)
-
-	for _, item := range items {
-		cName := strings.TrimSpace(item.clusterName)
-		if cName == "" {
-			cName = "General Cluster"
-		}
-
-		key := strings.ToLower(cName)
-		clusterID, exists := clusterCache[key]
-		if !exists {
-			err := tx.QueryRow("SELECT id FROM clusters WHERE LOWER(name) = LOWER(?)", cName).Scan(&clusterID)
-			if err != nil {
-				res, err := tx.Exec(
-					`INSERT INTO clusters (name, description, updated_at) VALUES (?, ?, CURRENT_TIMESTAMP)`,
-					cName, "Αυτόματα δημιουργημένο σύμπλεγμα από εισαγωγή CSV",
-				)
-				if err != nil {
-					return 0, 0, err
-				}
-				clusterID, err = res.LastInsertId()
-				if err != nil {
-					return 0, 0, err
-				}
-			}
-			clusterCache[key] = clusterID
-		}
-
-		v := item.vm
-		v.ClusterID = clusterID
-
-		var existingID int64
-		err := tx.QueryRow("SELECT id FROM vms WHERE cluster_id = ? AND LOWER(name) = LOWER(?)", v.ClusterID, strings.ToLower(v.Name)).Scan(&existingID)
-		if err != nil {
-			err = tx.QueryRow("SELECT id FROM vms WHERE LOWER(name) = LOWER(?)", strings.ToLower(v.Name)).Scan(&existingID)
-		}
-
-		if err == nil {
-			_, err = tx.Exec(`
-				UPDATE vms SET 
-					cluster_id = ?, name = ?, default_password = ?, url = ?, in_use = ?, is_important = ?, used_by_us = ?, ansible = ?, docker = ?,
-					cpu = ?, ram = ?, disk = ?, extra_disk = ?, ipv4 = ?, ipv6 = ?, vpn = ?, backup = ?, monitored = ?, os_upgrade = ?, app_upgrade = ?, 
-					os = ?, os_version = ?, contact_person = ?, description = ?, updated_at = CURRENT_TIMESTAMP
-				WHERE id = ?`,
-				v.ClusterID, v.Name, v.DefaultPassword, v.URL, v.InUse, v.IsImportant, v.UsedByUs, v.Ansible, v.Docker,
-				v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored, v.OSUpgrade, v.AppUpgrade,
-				v.OS, v.OSVersion, v.ContactPerson, v.Description, existingID,
-			)
-			if err != nil {
-				return 0, 0, err
-			}
-			updated++
-		} else {
-			_, err = tx.Exec(`
-				INSERT INTO vms (
-					cluster_id, name, default_password, url, in_use, is_important, used_by_us, ansible, docker,
-					cpu, ram, disk, extra_disk, ipv4, ipv6, vpn, backup, monitored, os_upgrade, app_upgrade,
-					os, os_version, contact_person, description, updated_at
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)`,
-				v.ClusterID, v.Name, v.DefaultPassword, v.URL, v.InUse, v.IsImportant, v.UsedByUs, v.Ansible, v.Docker,
-				v.CPU, v.RAM, v.Disk, v.ExtraDisk, v.IPv4, v.IPv6, v.VPN, v.Backup, v.Monitored, v.OSUpgrade, v.AppUpgrade,
-				v.OS, v.OSVersion, v.ContactPerson, v.Description,
-			)
-			if err != nil {
-				return 0, 0, err
-			}
-			inserted++
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		return 0, 0, err
-	}
-	return inserted, updated, nil
 }
 
 // --- DNS Records CRUD ---

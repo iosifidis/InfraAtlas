@@ -255,6 +255,29 @@
                         </div>
                     </div>
 
+                    <!-- Dashboard Charts Grid -->
+                    <div class="resources-grid" id="dashboard-charts-grid" style="margin-bottom: 1.5rem;">
+                        <div class="resource-card glass">
+                            <h3 style="display:flex; align-items:center; gap:0.5rem;">
+                                <i data-lucide="pie-chart" style="color:var(--primary);"></i>
+                                <span>Κατανομή Λειτουργικών Συστημάτων (OS)</span>
+                            </h3>
+                            <div id="os-chart-container" class="chart-container">
+                                <!-- SVG Donut Chart + Legend -->
+                            </div>
+                        </div>
+
+                        <div class="resource-card glass">
+                            <h3 style="display:flex; align-items:center; gap:0.5rem;">
+                                <i data-lucide="bar-chart-3" style="color:var(--success);"></i>
+                                <span>Ετοιμότητα &amp; Αυτοματισμός Υποδομής</span>
+                            </h3>
+                            <div id="readiness-chart-container" class="chart-container">
+                                <!-- Horizontal Bar Chart -->
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Cluster Resource Distribution Table -->
                     <div class="card-section glass">
                         <div class="section-header">
@@ -342,11 +365,6 @@
                         </div>
 
                         <div class="actions-row">
-                            <button class="btn btn-secondary" onclick="openVMImportModal()"
-                                style="margin-right: 0.5rem;">
-                                <i data-lucide="file-up"></i>
-                                <span>Εισαγωγή CSV (VMs)</span>
-                            </button>
                             <button class="btn btn-primary" onclick="openVMModal()">
                                 <i data-lucide="plus"></i>
                                 <span>Νέο VM</span>
@@ -819,6 +837,37 @@
                             </div>
                         </div>
                     </form>
+
+                    <!-- Database Backup & Restore -->
+                    <div class="settings-card glass" style="margin-top: 1.5rem;">
+                        <div class="settings-header">
+                            <i data-lucide="database"></i>
+                            <div>
+                                <h3>Διαχείριση Βάσης Δεδομένων (Backup &amp; Restore)</h3>
+                                <p class="text-secondary">Λήψη πλήρους αντιγράφου ασφαλείας της βάσης SQLite (.db) ή επαναφορά από υπάρχον backup.</p>
+                            </div>
+                        </div>
+                        <hr class="divider">
+                        <div style="display: flex; flex-wrap: wrap; gap: 1.5rem; align-items: flex-end; justify-content: space-between;">
+                            <div>
+                                <p style="font-size: 0.875rem; color: var(--text-secondary); margin-bottom: 0.75rem;">Δημιουργία ασφαλούς στιγμιότυπου (snapshot) όλων των δεδομένων:</p>
+                                <button type="button" class="btn btn-success" onclick="downloadBackup()">
+                                    <i data-lucide="download"></i>
+                                    <span>Λήψη Backup (.db)</span>
+                                </button>
+                            </div>
+                            <div style="flex: 1; min-width: 260px; max-width: 480px;">
+                                <label for="backup-restore-file" style="display:block; font-size:0.875rem; font-weight:600; margin-bottom:0.5rem;">Επαναφορά από Αρχείο Backup (.db)</label>
+                                <div style="display: flex; gap: 0.75rem; align-items: center; flex-wrap: wrap;">
+                                    <input type="file" id="backup-restore-file" accept=".db,.sqlite,.sqlite3" class="form-input" style="flex: 1; min-width: 180px;">
+                                    <button type="button" class="btn btn-warning" onclick="restoreBackup()">
+                                        <i data-lucide="upload"></i>
+                                        <span>Επαναφορά</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
             </div>
         </main>
@@ -862,6 +911,7 @@
                 <button type="button" class="modal-tab-btn active" data-modaltab="vm-tab-basic">Βασικά Στοιχεία</button>
                 <button type="button" class="modal-tab-btn" data-modaltab="vm-tab-specs">Προδιαγραφές & specs</button>
                 <button type="button" class="modal-tab-btn" data-modaltab="vm-tab-network">Δίκτυο & Συντήρηση</button>
+                <button type="button" class="modal-tab-btn" data-modaltab="vm-tab-software">Λογισμικό &amp; Εκδόσεις</button>
             </div>
 
             <form id="vm-form" novalidate onsubmit="saveVM(event)">
@@ -1008,6 +1058,31 @@
                     </div>
                 </div>
 
+                <!-- TAB 4: Installed Software & Versions -->
+                <div id="vm-tab-software" class="modal-tab-content">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.75rem; margin-bottom: 0.75rem;">
+                        <p class="text-secondary" style="font-size: 0.85rem; margin: 0;">Καταγράψτε βασικές εφαρμογές &amp; εκδόσεις (π.χ. nginx, php, wordpress, matrix).</p>
+                        <button type="button" class="btn btn-outline" style="padding: 0.35rem 0.75rem; font-size: 0.8125rem;" onclick="addSoftwareRow()">
+                            <i data-lucide="plus" style="width:14px; height:14px;"></i>
+                            <span>Προσθήκη Εφαρμογής</span>
+                        </button>
+                    </div>
+                    <div class="software-quick-chips" style="display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem;">
+                        <button type="button" class="chip-btn" onclick="addSoftwareRow('nginx')">+ nginx</button>
+                        <button type="button" class="chip-btn" onclick="addSoftwareRow('apache')">+ apache</button>
+                        <button type="button" class="chip-btn" onclick="addSoftwareRow('php')">+ php</button>
+                        <button type="button" class="chip-btn" onclick="addSoftwareRow('postgresql')">+ postgresql</button>
+                        <button type="button" class="chip-btn" onclick="addSoftwareRow('mariadb')">+ mariadb</button>
+                        <button type="button" class="chip-btn" onclick="addSoftwareRow('wordpress')">+ wordpress</button>
+                        <button type="button" class="chip-btn" onclick="addSoftwareRow('matrix')">+ matrix</button>
+                        <button type="button" class="chip-btn" onclick="addSoftwareRow('nodejs')">+ nodejs</button>
+                        <button type="button" class="chip-btn" onclick="addSoftwareRow('redis')">+ redis</button>
+                    </div>
+                    <div id="vm-software-list" class="software-rows-container">
+                        <!-- Dynamic software rows -->
+                    </div>
+                </div>
+
                 <div class="modal-actions">
                     <button type="button" class="btn btn-outline" onclick="closeVMModal()">Ακύρωση</button>
                     <button type="submit" class="btn btn-primary">Αποθήκευση</button>
@@ -1134,36 +1209,6 @@
                     <button type="submit" class="btn btn-primary">
                         <i data-lucide="save"></i>
                         <span>Αποθήκευση Αλλαγών</span>
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
-
-    <!-- MODAL: Import VM CSV File -->
-    <div id="vm-import-modal" class="modal-overlay hidden">
-        <div class="modal-box glass modal-large" role="dialog" aria-modal="true" aria-labelledby="vm-import-title">
-            <div class="modal-header">
-                <h3 id="vm-import-title">Εισαγωγή VMs από αρχείο CSV</h3>
-                <button class="btn-close" onclick="closeVMImportModal()" aria-label="Κλείσιμο"><i data-lucide="x"></i></button>
-            </div>
-            <form id="vm-import-form" onsubmit="submitVMImport(event)">
-                <div class="form-group">
-                    <label for="vm-file-input">Επιλογή αρχείου CSV (π.χ. ΕΕΛΛΑΚ-systems.ods.csv)</label>
-                    <input type="file" id="vm-file-input" accept=".csv,.txt">
-                </div>
-                <div class="divider"><span>ή Επικόλληση Περιεχομένου</span></div>
-                <div class="form-group">
-                    <label for="vm-paste-input">Περιεχόμενο CSV</label>
-                    <textarea id="vm-paste-input" rows="8"
-                        placeholder="Επικολλήστε εδώ τις γραμμές του CSV..."></textarea>
-                </div>
-                <div id="vm-import-alert" class="alert hidden" style="margin-top: 1rem;"></div>
-                <div class="modal-actions">
-                    <button type="button" class="btn btn-outline" onclick="closeVMImportModal()">Ακύρωση</button>
-                    <button type="submit" class="btn btn-success">
-                        <i data-lucide="file-up"></i>
-                        <span>Εισαγωγή VMs</span>
                     </button>
                 </div>
             </form>

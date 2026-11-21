@@ -11,8 +11,8 @@ import {
     openDeleteModal, closeDeleteModal, confirmDeletion,
     openDNSModal, closeDNSModal, saveDNSRecord,
     openDNSImportModal, closeDNSImportModal, submitDNSImport,
-    openVMImportModal, closeVMImportModal, submitVMImport,
-    openProfileModal, closeProfileModal, submitProfileUpdate
+    openProfileModal, closeProfileModal, submitProfileUpdate,
+    addSoftwareRow, removeSoftwareRow
 } from './modals.js';
 
 // --- Authentication & Setup Flows ---
@@ -408,7 +408,6 @@ export function setupEventListeners() {
         else if (id === 'vm-modal') closeVMModal();
         else if (id === 'dns-modal') closeDNSModal();
         else if (id === 'dns-import-modal') closeDNSImportModal();
-        else if (id === 'vm-import-modal') closeVMImportModal();
         else if (id === 'profile-modal') closeProfileModal();
         else if (id === 'delete-modal') closeDeleteModal();
     });
@@ -421,6 +420,35 @@ export function setupEventListeners() {
     if (dnsSearch) dnsSearch.addEventListener('input', debouncedFetchDNS);
 }
 
+export function downloadBackup() {
+    window.open('/api/backup', '_blank');
+}
+
+export function restoreBackup() {
+    const fileInput = document.getElementById('backup-restore-file');
+    if (!fileInput || fileInput.files.length === 0) {
+        showToast('Παρακαλώ επιλέξτε ένα αρχείο backup (.db).', 'error');
+        return;
+    }
+    if (!confirm('Η επαναφορά θα αντικαταστήσει όλα τα τρέχοντα δεδομένα με το επιλεγμένο backup. Συνέχεια;')) {
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('backup', fileInput.files[0]);
+
+    apiFetch('/api/backup/restore', {
+        method: 'POST',
+        body: formData
+    })
+    .then(data => {
+        showToast(data.message || 'Η επαναφορά ολοκληρώθηκε!', 'success');
+        fileInput.value = '';
+        checkAuthStatus();
+    })
+    .catch(err => showToast(err.message, 'error'));
+}
+
 // Bind functions to window so inline HTML attributes continue working seamlessly
 Object.assign(window, {
     state,
@@ -430,8 +458,9 @@ Object.assign(window, {
     openDeleteModal, closeDeleteModal, confirmDeletion,
     openDNSModal, closeDNSModal, saveDNSRecord,
     openDNSImportModal, closeDNSImportModal, submitDNSImport,
-    openVMImportModal, closeVMImportModal, submitVMImport,
     openProfileModal, closeProfileModal, submitProfileUpdate,
+    addSoftwareRow, removeSoftwareRow,
+    downloadBackup, restoreBackup,
     saveSettings, applySettingsToUI, switchTab, linkDNSToVM, sortDNSTable,
     renderVMs, fetchVMs, fetchClusters, fetchStats, fetchDNSRecords, runReport, applyReportPreset,
     exportReportCSV, printReport, toggleVMUpgrade

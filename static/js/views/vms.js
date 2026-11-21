@@ -30,7 +30,11 @@ export function renderVMs() {
             (v.url && v.url.toLowerCase().includes(search)) ||
             (v.os && v.os.toLowerCase().includes(search)) ||
             (v.contact_person && v.contact_person.toLowerCase().includes(search)) ||
-            (v.description && v.description.toLowerCase().includes(search))
+            (v.description && v.description.toLowerCase().includes(search)) ||
+            (Array.isArray(v.software) && v.software.some(s =>
+                (s.name && s.name.toLowerCase().includes(search)) ||
+                (s.version && s.version.toLowerCase().includes(search))
+            ))
         );
     }
     if (clusterId) {
@@ -70,12 +74,22 @@ export function renderVMs() {
 
         const specsText = `CPU: ${v.cpu} | RAM: ${v.ram} | Disk: ${v.disk}${v.extra_disk > 0 ? ' +' + v.extra_disk : ''}`;
 
+        let softwarePillsHtml = '';
+        if (Array.isArray(v.software) && v.software.length > 0) {
+            const shown = v.software.slice(0, 4).map(s =>
+                `<span class="software-pill">${escapeHTML(s.name)}${s.version ? ' ' + escapeHTML(s.version) : ''}</span>`
+            ).join('');
+            const extra = v.software.length > 4 ? `<span class="software-pill">+${v.software.length - 4}</span>` : '';
+            softwarePillsHtml = `<div style="display:flex; flex-wrap:wrap; gap:0.3rem; margin-top:0.35rem;">${shown}${extra}</div>`;
+        }
+
         row.innerHTML = `
             <td class="col-vm-info">
                 <div class="vm-row-flex">
                     <div class="vm-main-details">
                         <div class="vm-name-title">${escapeHTML(v.name)}</div>
                         <div class="vm-url-sub">${v.url ? `<a href="${escapeHTML(sanitizeURL(v.url))}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation();">${escapeHTML(v.url)}</a>` : '<span class="no-url-text">Χωρίς Domain</span>'}</div>
+                        ${softwarePillsHtml}
                     </div>
                     <div class="mobile-chevron-icon">
                         <i data-lucide="chevron-right"></i>

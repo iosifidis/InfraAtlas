@@ -121,6 +121,8 @@ export function renderStatsDashboard() {
         window.lucide.createIcons({ nodes: [document.getElementById('tab-dashboard')] });
     }
 
+    renderDashboardCharts(stats);
+
     const tbody = document.getElementById('cluster-resources-tbody');
     if (tbody) {
         tbody.innerHTML = '';
@@ -205,4 +207,110 @@ export function populateClusterDropdowns() {
 
     filterDropdown.value = filterVal;
     reportDropdown.value = reportVal;
+}
+
+export function renderDashboardCharts(stats) {
+    renderOSChart();
+    renderReadinessChart(stats);
+}
+
+function renderOSChart() {
+    const container = document.getElementById('os-chart-container');
+    if (!container) return;
+
+    const vms = state.vms || [];
+    if (vms.length === 0) {
+        container.innerHTML = `<p class="text-secondary" style="font-size:0.875rem; padding:1rem 0;">Δεν υπάρχουν καταχωρημένα VMs.</p>`;
+        return;
+    }
+
+    const counts = new Map();
+    vms.forEach(v => {
+        const raw = (v.os || '').trim();
+        const label = raw || 'Χωρίς OS';
+        counts.set(label, (counts.get(label) || 0) + 1);
+    });
+
+    const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+    const top = sorted.slice(0, 5);
+    const restCount = sorted.slice(5).reduce((acc, [, c]) => acc + c, 0);
+    if (restCount > 0) {
+        top.push(['Άλλα', restCount]);
+    }
+
+    const palette = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#64748b'];
+    const total = vms.length;
+    const radius = 52;
+    const circumference = 2 * Math.PI * radius;
+
+    let offset = 0;
+    const segmentsHtml = top.map(([label, count], idx) => {
+        const pct = count / total;
+        const dash = pct * circumference;
+        const color = palette[idx % palette.length];
+        const seg = `<circle cx="70" cy="70" r="${radius}" fill="transparent" stroke="${color}" stroke-width="18" stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 70 70)"></circle>`;
+        offset += dash;
+        return seg;
+    }).join('');
+
+    const legendHtml = top.map(([label, count], idx) => {
+        const pct = ((count / total) * 100).toFixed(0);
+        const color = palette[idx % palette.length];
+        return `
+            <div class="legend-item">
+                <span class="legend-label"><span class="legend-dot" style="background:${color};"></span>${escapeHTML(label)}</span>
+                <span class="legend-val">${count} (${pct}%)</span>
+            </div>
+        `;
+    }).join('');
+
+    container.innerHTML = `
+        <div class="donut-chart-layout">
+            <div class="donut-svg-wrap">
+                <svg width="140" height="140" viewBox="0 0 140 140" aria-label="Κατανομή Λειτουργικών Συστημάτων">
+                    ${segmentsHtml}
+                </svg>
+                <div class="donut-center-label">
+                    <span class="donut-center-value">${total}</span>
+                    <span class="donut-center-sub">VMs</span>
+                </div>
+            </div>
+            <div class="chart-legend">${legendHtml}</div>
+        </div>
+    `;
+}
+
+function renderReadinessChart(stats) {
+    const container = document.getElementById('readiness-chart-container');
+    if (!container) return;
+
+    const total = stats.total_vms || 0;
+    if (total === 0) {
+        container.innerHTML = `<p class="text-secondary" style="font-size:0.875rem; padding:1rem 0;">Δεν υπάρχουν δεδομένα για εμφάνιση.</p>`;
+        return;
+    }
+
+    const metrics = [
+        { label: 'Σε Χρήση', count: stats.in_use_vms || 0, color: 'var(--success)' },
+        { label: 'Monitored', count: stats.monitored_vms || 0, color: 'var(--info)' },
+        { label: 'Ansible', count: stats.ansible_vms || 0, color: 'var(--primary)' },
+        { label: 'Docker', count: stats.docker_vms || 0, color: '#8b5cf6' },
+        { label: 'VPN', count: stats.vpn_vms || 0, color: 'var(--warning)' },
+        { label: 'Σημαντικά', count: stats.important_vms || 0, color: 'var(--danger)' },
+    ];
+
+    container.innerHTML = `<div class="readiness-bars">${metrics.map(m => {
+        const pct = Math.min(100, (m.count / total) * 100);
+        return `
+            <div class="readiness-row">
+                <div class="readiness-row-header">
+                    <span>${m.label}</span>
+                    <span class="legend-val">${m.count} / ${total} (${pct.toFixed(0)}%)</span>
+                </div>
+                <div class="meter-bar">
+                    <div class="meter-fill" style="width:${pct}%; background:${m.color};"></div>
+                </div>
+            </div>
+        `;
+    }).join('')}</div>`;
 }

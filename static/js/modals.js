@@ -108,6 +108,7 @@ export function openVMModal(id = null) {
                 document.getElementById('vm-monitored').checked = v.monitored === 1;
                 document.getElementById('vm-os-upgrade').checked = v.os_upgrade === 1;
                 document.getElementById('vm-app-upgrade').checked = v.app_upgrade === 1;
+                renderSoftwareRows(v.software || []);
 
                 modal.classList.remove('hidden');
                 openFocusTrap(modal.querySelector('.modal-box'), _trigger);
@@ -121,6 +122,7 @@ export function openVMModal(id = null) {
         document.getElementById('vm-docker').checked = false;
         document.getElementById('vm-os-upgrade').checked = false;
         document.getElementById('vm-app-upgrade').checked = false;
+        renderSoftwareRows([]);
 
         const activeClusterFilter = document.getElementById('filter-cluster').value;
         if (activeClusterFilter) {
@@ -198,7 +200,8 @@ export function saveVM(e) {
         monitored: document.getElementById('vm-monitored').checked ? 1 : 0,
         vpn: document.getElementById('vm-vpn').checked ? 1 : 0,
         os_upgrade: document.getElementById('vm-os-upgrade').checked ? 1 : 0,
-        app_upgrade: document.getElementById('vm-app-upgrade').checked ? 1 : 0
+        app_upgrade: document.getElementById('vm-app-upgrade').checked ? 1 : 0,
+        software: collectSoftwareRows()
     };
 
     const method = id ? 'PUT' : 'POST';
@@ -426,83 +429,67 @@ export function submitDNSImport(e) {
     }
 }
 
-// --- VM Import Modal ---
-export function openVMImportModal() {
-    const _trigger = document.activeElement;
-    const modal = document.getElementById('vm-import-modal');
-    const form = document.getElementById('vm-import-form');
-    const alertBox = document.getElementById('vm-import-alert');
-    form.reset();
-    alertBox.classList.add('hidden');
-    modal.classList.remove('hidden');
-    openFocusTrap(modal.querySelector('.modal-box'), _trigger);
-}
+// --- VM Software Stack Helpers ---
+export function addSoftwareRow(defaultName = '', version = '', notes = '') {
+    const container = document.getElementById('vm-software-list');
+    if (!container) return;
 
-export function closeVMImportModal() {
-    closeFocusTrap();
-    document.getElementById('vm-import-modal').classList.add('hidden');
-}
+    const emptyMsg = container.querySelector('.software-empty-msg');
+    if (emptyMsg) emptyMsg.remove();
 
-export function submitVMImport(e) {
-    e.preventDefault();
-    const fileInput = document.getElementById('vm-file-input');
-    const pasteInput = document.getElementById('vm-paste-input').value.trim();
-    const alertBox = document.getElementById('vm-import-alert');
+    const row = document.createElement('div');
+    row.className = 'software-row';
+    row.innerHTML = `
+        <input type="text" class="form-input sw-name" placeholder="Πρόγραμμα (π.χ. nginx)" value="${escapeHTML(defaultName)}">
+        <input type="text" class="form-input sw-version" placeholder="Έκδοση (π.χ. 1.24)" value="${escapeHTML(version)}">
+        <input type="text" class="form-input sw-notes" placeholder="Σημείωση (προαιρετικό)" value="${escapeHTML(notes)}">
+        <button type="button" class="btn-icon-only text-danger" onclick="removeSoftwareRow(this)" title="Αφαίρεση">
+            <i data-lucide="trash-2"></i>
+        </button>
+    `;
+    container.appendChild(row);
+    if (window.lucide) window.lucide.createIcons({ nodes: [row] });
 
-    const handleSuccess = (data) => {
-        alertBox.className = 'alert alert-success';
-        alertBox.textContent = `Επιτυχία! Εισήχθησαν ${data.inserted} νέα VMs και ενημερώθηκαν ${data.updated}.`;
-        alertBox.classList.remove('hidden');
-        setTimeout(() => {
-            closeVMImportModal();
-            fetchClusters();
-            fetchVMs();
-            if (window.fetchStats) window.fetchStats();
-        }, 1200);
-    };
-
-    const handleError = (err) => {
-        alertBox.className = 'alert alert-danger';
-        alertBox.textContent = err.message;
-        alertBox.classList.remove('hidden');
-    };
-
-    if (fileInput.files.length > 0) {
-        const reader = new FileReader();
-        reader.onload = function (evt) {
-            const csvContent = evt.target.result;
-            fetch('/api/vms/import', {
-                method: 'POST',
-                headers: { 'Content-Type': 'text/csv' },
-                body: csvContent
-            })
-                .then(async res => {
-                    const data = await res.json();
-                    if (!res.ok) throw new Error(data.error || 'Σφάλμα εισαγωγής CSV');
-                    return data;
-                })
-                .then(handleSuccess)
-                .catch(handleError);
-        };
-        reader.readAsText(fileInput.files[0]);
-    } else if (pasteInput) {
-        fetch('/api/vms/import', {
-            method: 'POST',
-            headers: { 'Content-Type': 'text/csv' },
-            body: pasteInput
-        })
-            .then(async res => {
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.error || 'Σφάλμα εισαγωγής CSV');
-                return data;
-            })
-            .then(handleSuccess)
-            .catch(handleError);
-    } else {
-        alertBox.className = 'alert alert-danger';
-        alertBox.textContent = 'Παρακαλώ επιλέξτε αρχείο CSV ή επικολλήστε το περιεχόμενο.';
-        alertBox.classList.remove('hidden');
+    if (!defaultName) {
+        row.querySelector('.sw-name')?.focus();
+    } else if (!version) {
+        row.querySelector('.sw-version')?.focus();
     }
+}
+
+export function removeSoftwareRow(btn) {
+    const row = btn.closest('.software-row');
+    if (row) row.remove();
+    const container = document.getElementById('vm-software-list');
+    if (container && container.children.length === 0) {
+        container.innerHTML = `<p class="text-secondary software-empty-msg" style="font-size:0.8125rem; text-align:center; padding:1rem 0;">Δεν έχουν καταχωρηθεί εφαρμογές. Πατήστε "+ Προσθήκη Εφαρμογής" ή επιλέξτε από τα παραπάνω tags.</p>`;
+    }
+}
+
+export function renderSoftwareRows(items = []) {
+    const container = document.getElementById('vm-software-list');
+    if (!container) return;
+    container.innerHTML = '';
+    if (!items || items.length === 0) {
+        container.innerHTML = `<p class="text-secondary software-empty-msg" style="font-size:0.8125rem; text-align:center; padding:1rem 0;">Δεν έχουν καταχωρηθεί εφαρμογές. Πατήστε "+ Προσθήκη Εφαρμογής" ή επιλέξτε από τα παραπάνω tags.</p>`;
+        return;
+    }
+    items.forEach(s => addSoftwareRow(s.name || '', s.version || '', s.notes || ''));
+}
+
+export function collectSoftwareRows() {
+    const container = document.getElementById('vm-software-list');
+    if (!container) return [];
+    const rows = [];
+    container.querySelectorAll('.software-row').forEach(rowEl => {
+        const name = rowEl.querySelector('.sw-name')?.value.trim() || '';
+        const version = rowEl.querySelector('.sw-version')?.value.trim() || '';
+        const notes = rowEl.querySelector('.sw-notes')?.value.trim() || '';
+        if (name) {
+            rows.push({ name, version, notes });
+        }
+    });
+    return rows;
 }
 
 // --- Profile Modal ---

@@ -68,17 +68,18 @@ func Run(staticFS embed.FS) {
 	// VMs API
 	apiMux.HandleFunc("GET /api/vms", handleVMs)
 	apiMux.HandleFunc("POST /api/vms", handleVMs)
-	apiMux.HandleFunc("POST /api/vms/import", importVMsHandler)
 	apiMux.HandleFunc("GET /api/vms/{id}", handleVMDetail)
 	apiMux.HandleFunc("PUT /api/vms/{id}", handleVMDetail)
 	apiMux.HandleFunc("PATCH /api/vms/{id}", handleVMDetail)
 	apiMux.HandleFunc("DELETE /api/vms/{id}", handleVMDetail)
 
-	// Stats, Settings and Export APIs
+	// Stats, Settings, Backup and Export APIs
 	apiMux.HandleFunc("GET /api/stats", handleStats)
 	apiMux.HandleFunc("GET /api/settings", handleSettings)
 	apiMux.HandleFunc("POST /api/settings", handleSettings)
 	apiMux.HandleFunc("GET /api/export/csv", handleExportCSV)
+	apiMux.HandleFunc("GET /api/backup", handleBackupDownload)
+	apiMux.HandleFunc("POST /api/backup/restore", handleBackupRestore)
 
 	// DNS Records API
 	apiMux.HandleFunc("GET /api/dns", handleDNSRecords)
