@@ -2,6 +2,7 @@ package app
 
 import (
 	"crypto/rand"
+	"crypto/subtle"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -171,6 +172,20 @@ func AuthMiddleware(next http.Handler) http.Handler {
 				return
 			}
 			setupCompleted.Store(true)
+		}
+
+		// Support optional Bearer API Token for Ansible / automation scripts
+		if authHeader := r.Header.Get("Authorization"); strings.HasPrefix(authHeader, "Bearer ") {
+			providedToken := strings.TrimSpace(strings.TrimPrefix(authHeader, "Bearer "))
+			settings, err := GetSettings()
+			if err == nil && settings["api_token"] != "" &&
+				subtle.ConstantTimeCompare([]byte(providedToken), []byte(settings["api_token"])) == 1 {
+				r.Header.Set("X-Authenticated-User", "api-token")
+				next.ServeHTTP(w, r)
+				return
+			}
+			respondWithError(w, http.StatusUnauthorized, "Unauthorized: Invalid API token")
+			return
 		}
 
 		// Check session cookie

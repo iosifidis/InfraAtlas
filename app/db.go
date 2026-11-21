@@ -2,12 +2,15 @@ package app
 
 import (
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	_ "modernc.org/sqlite"
 )
+
+var ErrVMNotFound = errors.New("vm not found")
 
 var (
 	DB            *sql.DB
@@ -636,6 +639,51 @@ func DeleteVM(id int64) error {
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+// SyncVM updates OS, specs, and software versions for an existing VM matched by name or IPv4.
+func SyncVM(p VMSyncPayload) (VM, error) {
+	var vmID int64
+	var err error
+
+	if p.Name != "" {
+		err = DB.QueryRow(`SELECT id FROM vms WHERE LOWER(name) = LOWER(?) LIMIT 1`, p.Name).Scan(&vmID)
+	}
+	if (err != nil || vmID == 0) && p.IPv4 != "" {
+		err = DB.QueryRow(`SELECT id FROM vms WHERE ipv4 = ? LIMIT 1`, p.IPv4).Scan(&vmID)
+	}
+	if err != nil || vmID == 0 {
+		return VM{}, ErrVMNotFound
+	}
+
+	current, err := GetVM(vmID)
+	if err != nil {
+		return VM{}, err
+	}
+
+	if p.OS != "" {
+		current.OS = p.OS
+	}
+	if p.OSVersion != "" {
+		current.OSVersion = p.OSVersion
+	}
+	if p.CPU > 0 {
+		current.CPU = p.CPU
+	}
+	if p.RAM > 0 {
+		current.RAM = p.RAM
+	}
+	if p.Disk > 0 {
+		current.Disk = p.Disk
+	}
+	if p.Software != nil {
+		current.Software = p.Software
+	}
+
+	if err := UpdateVM(&current); err != nil {
+		return VM{}, err
+	}
+	return GetVM(vmID)
 }
 
 // --- DNS Records CRUD ---

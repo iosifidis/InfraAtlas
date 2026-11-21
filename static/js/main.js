@@ -2,7 +2,7 @@ import { state, defaultFields } from './state.js';
 import { apiFetch, setUnauthorizedHandler } from './api.js';
 import { escapeHTML, debounce, togglePasswordVisibility, showAlert, showToast } from './utils.js';
 import { renderStatsDashboard, renderClusters, populateClusterDropdowns } from './views/dashboard.js';
-import { renderVMs, renderUpgradesTab, toggleVMUpgrade } from './views/vms.js';
+import { renderVMs, renderUpgradesTab, toggleVMUpgrade, toggleSelectAllVMs, updateSelectedVMsCount, getSelectedVMIDs } from './views/vms.js';
 import { fetchDNSRecords, renderDNSRecords, sortDNSTable, linkDNSToVM } from './views/dns.js';
 import { runReport, applyReportPreset, exportReportCSV, printReport } from './views/reports.js';
 import {
@@ -94,6 +94,7 @@ export function initializeDashboard() {
 
     loadUserProfile();
     fetchSettings();
+    fetchAnsibleStatus();
     fetchStats();
     fetchClusters();
     fetchVMs();
@@ -237,6 +238,13 @@ export function applySettingsToUI() {
     if (capDisk) capDisk.value = state.settings.capacity_disk || '';
     if (capIps) capIps.value = state.settings.capacity_ips || '';
 
+    const apiTokenEl = document.getElementById('setting-api_token');
+    const sshUserEl = document.getElementById('setting-ansible_ssh_user');
+    const sshKeyEl = document.getElementById('setting-ansible_ssh_key');
+    if (apiTokenEl) apiTokenEl.value = state.settings.api_token || '';
+    if (sshUserEl) sshUserEl.value = state.settings.ansible_ssh_user || '';
+    if (sshKeyEl) sshKeyEl.value = state.settings.ansible_ssh_key || '';
+
     defaultFields.forEach(field => {
         const toggle = document.getElementById(`field-${field}`);
         if (toggle) {
@@ -275,6 +283,11 @@ export function saveSettings(e) {
     if (capRam) payload['capacity_ram'] = capRam.value.trim();
     if (capDisk) payload['capacity_disk'] = capDisk.value.trim();
     if (capIps) payload['capacity_ips'] = capIps.value.trim();
+
+    const sshUserEl = document.getElementById('setting-ansible_ssh_user');
+    const sshKeyEl = document.getElementById('setting-ansible_ssh_key');
+    if (sshUserEl) payload['ansible_ssh_user'] = sshUserEl.value.trim();
+    if (sshKeyEl) payload['ansible_ssh_key'] = sshKeyEl.value.trim();
 
     defaultFields.forEach(field => {
         const toggle = document.getElementById(`field-${field}`);
@@ -408,6 +421,7 @@ export function setupEventListeners() {
         else if (id === 'vm-modal') closeVMModal();
         else if (id === 'dns-modal') closeDNSModal();
         else if (id === 'dns-import-modal') closeDNSImportModal();
+        else if (id === 'ansible-sync-modal') closeAnsibleSyncModal();
         else if (id === 'profile-modal') closeProfileModal();
         else if (id === 'delete-modal') closeDeleteModal();
     });
@@ -418,6 +432,97 @@ export function setupEventListeners() {
     const dnsSearch = document.getElementById('dns-search');
     if (vmSearch) vmSearch.addEventListener('input', debouncedRenderVMs);
     if (dnsSearch) dnsSearch.addEventListener('input', debouncedFetchDNS);
+}
+
+export function fetchAnsibleStatus() {
+    apiFetch('/api/ansible/status')
+        .then(data => {
+            state.ansibleAvailable = !!data.available;
+            const statusEl = document.getElementById('ansible-server-status');
+            if (statusEl) {
+                if (data.available) {
+                    statusEl.innerHTML = `<span class="badge badge-success">Ansible Διαθέσιμο στον Server</span> <span style="margin-left:0.5rem;"><code>${escapeHTML(data.binary_path)}</code> — Μπορείτε να τρέξετε συγχρονισμό απευθείας από την καρτέλα VMs.</span>`;
+                } else {
+                    statusEl.innerHTML = `<span class="badge badge-info">Αυτόνομη Λειτουργία (Standalone)</span> <span style="margin-left:0.5rem;">Το <code>ansible-playbook</code> δεν είναι εγκατεστημένο στον server. Μπορείτε να τρέξετε το <code>ansible/sync-infraatlas.yml</code> από το workstation σας με το API Token.</span>`;
+                }
+            }
+        })
+        .catch(() => {});
+}
+
+export function generateAPIToken() {
+    apiFetch('/api/settings/token', { method: 'POST' })
+        .then(data => {
+            state.settings.api_token = data.api_token;
+            const el = document.getElementById('setting-api_token');
+            if (el) el.value = data.api_token;
+            showToast('Δημιουργήθηκε νέο API Token!', 'success');
+        })
+        .catch(err => showToast(err.message, 'error'));
+}
+
+export function copyAPIToken() {
+    const el = document.getElementById('setting-api_token');
+    if (!el || !el.value) {
+        showToast('Δεν υπάρχει API Token. Πατήστε πρώτα "Δημιουργία Token".', 'info');
+        return;
+    }
+    navigator.clipboard.writeText(el.value)
+        .then(() => showToast('Το API Token αντιγράφηκε!', 'success'))
+        .catch(() => showToast('Αποτυχία αντιγραφής στο clipboard.', 'error'));
+}
+
+export function closeAnsibleSyncModal() {
+    document.getElementById('ansible-sync-modal')?.classList.add('hidden');
+}
+
+export function syncSelectedVMsWithAnsible() {
+    const vmIDs = getSelectedVMIDs();
+    if (vmIDs.length === 0) {
+        showToast('Επιλέξτε τουλάχιστον ένα VM.', 'info');
+        return;
+    }
+
+    const modal = document.getElementById('ansible-sync-modal');
+    const statusEl = document.getElementById('ansible-sync-status');
+    const outputEl = document.getElementById('ansible-sync-output');
+    if (!modal || !statusEl || !outputEl) return;
+
+    modal.classList.remove('hidden');
+
+    if (!state.ansibleAvailable) {
+        const origin = window.location.origin;
+        const token = state.settings.api_token || '<API_TOKEN_ΑΠΟ_ΡΥΘΜΙΣΕΙΣ>';
+        statusEl.innerHTML = `<span class="badge badge-info">Εξωτερική Εκτέλεση Ansible</span> Το <code>ansible-playbook</code> δεν είναι εγκατεστημένο σε αυτόν τον server. Τρέξτε την παρακάτω εντολή από το control node σας:`;
+        outputEl.textContent =
+            `INFRAATLAS_URL="${origin}" \\\n` +
+            `INFRAATLAS_TOKEN="${token}" \\\n` +
+            `ansible-playbook -i "${origin}/api/ansible/inventory?all=1" ansible/sync-infraatlas.yml`;
+        return;
+    }
+
+    statusEl.innerHTML = `<i data-lucide="loader-2" class="spin" style="width:16px;height:16px;vertical-align:middle;margin-right:6px;"></i> Εκτέλεση Ansible playbook σε ${vmIDs.length} VM(s)... Παρακαλώ περιμένετε.`;
+    outputEl.textContent = 'Running ansible-playbook...';
+    if (window.lucide) window.lucide.createIcons({ nodes: [statusEl] });
+
+    apiFetch('/api/ansible/sync', {
+        method: 'POST',
+        body: JSON.stringify({ vm_ids: vmIDs })
+    })
+    .then(data => {
+        if (data.success) {
+            statusEl.innerHTML = `<span class="badge badge-success">Επιτυχία</span> ${escapeHTML(data.message)}`;
+            fetchVMs();
+            fetchStats();
+        } else {
+            statusEl.innerHTML = `<span class="badge badge-danger">Σφάλμα</span> ${escapeHTML(data.message)}`;
+        }
+        outputEl.textContent = data.output || '';
+    })
+    .catch(err => {
+        statusEl.innerHTML = `<span class="badge badge-danger">Αποτυχία</span> ${escapeHTML(err.message)}`;
+        outputEl.textContent = err.message;
+    });
 }
 
 export function downloadBackup() {
@@ -461,6 +566,8 @@ Object.assign(window, {
     openProfileModal, closeProfileModal, submitProfileUpdate,
     addSoftwareRow, removeSoftwareRow,
     downloadBackup, restoreBackup,
+    toggleSelectAllVMs, updateSelectedVMsCount, syncSelectedVMsWithAnsible, closeAnsibleSyncModal,
+    generateAPIToken, copyAPIToken,
     saveSettings, applySettingsToUI, switchTab, linkDNSToVM, sortDNSTable,
     renderVMs, fetchVMs, fetchClusters, fetchStats, fetchDNSRecords, runReport, applyReportPreset,
     exportReportCSV, printReport, toggleVMUpgrade

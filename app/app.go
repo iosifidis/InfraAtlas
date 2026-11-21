@@ -11,11 +11,14 @@ import (
 	"time"
 )
 
+var currentPort string
+
 // Run initializes the application, sets up routes, embeds static files, and starts the HTTP server.
 func Run(staticFS embed.FS) {
 	dbPath := flag.String("db", "./data/dashboard.db", "Path to SQLite database file")
 	port := flag.String("port", "8080", "Port to listen on")
 	flag.Parse()
+	currentPort = *port
 
 	// Ensure the database directory exists
 	if dbDir := filepath.Dir(*dbPath); dbDir != "." {
@@ -68,10 +71,17 @@ func Run(staticFS embed.FS) {
 	// VMs API
 	apiMux.HandleFunc("GET /api/vms", handleVMs)
 	apiMux.HandleFunc("POST /api/vms", handleVMs)
+	apiMux.HandleFunc("POST /api/vms/sync", handleVMSync)
 	apiMux.HandleFunc("GET /api/vms/{id}", handleVMDetail)
 	apiMux.HandleFunc("PUT /api/vms/{id}", handleVMDetail)
 	apiMux.HandleFunc("PATCH /api/vms/{id}", handleVMDetail)
 	apiMux.HandleFunc("DELETE /api/vms/{id}", handleVMDetail)
+
+	// Ansible Integration API (Optional)
+	apiMux.HandleFunc("GET /api/ansible/status", handleAnsibleStatus)
+	apiMux.HandleFunc("GET /api/ansible/inventory", handleAnsibleInventory)
+	apiMux.HandleFunc("POST /api/ansible/sync", handleAnsibleRun)
+	apiMux.HandleFunc("POST /api/settings/token", handleAPITokenGenerate)
 
 	// Stats, Settings, Backup and Export APIs
 	apiMux.HandleFunc("GET /api/stats", handleStats)

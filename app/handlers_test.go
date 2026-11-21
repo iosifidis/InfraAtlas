@@ -389,3 +389,83 @@ func TestBackupValidation(t *testing.T) {
 		t.Errorf("expected validateSQLiteBackup to fail for non-sqlite file")
 	}
 }
+
+func TestVMSyncAndAnsibleInventory(t *testing.T) {
+	setupTestDB(t)
+
+	c := &Cluster{Name: "Prod Cluster"}
+	if err := CreateCluster(c); err != nil {
+		t.Fatalf("CreateCluster failed: %v", err)
+	}
+	v := &VM{
+		ClusterID: c.ID,
+		Name:      "web-01",
+		IPv4:      "10.0.0.10",
+		Ansible:   1,
+	}
+	if err := CreateVM(v); err != nil {
+		t.Fatalf("CreateVM failed: %v", err)
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/vms/sync", handleVMSync)
+	mux.HandleFunc("GET /api/ansible/inventory", handleAnsibleInventory)
+
+	syncBody := `{"name":"web-01","os":"Ubuntu","os_version":"24.04","cpu":4,"ram":8,"software":[{"name":"nginx","version":"1.24.0"},{"name":"php","version":"8.3"}]}`
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, httptest.NewRequest("POST", "/api/vms/sync", strings.NewReader(syncBody)))
+	if rr.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK on /api/vms/sync, got %d: %s", rr.Code, rr.Body.String())
+	}
+
+	var synced VM
+	if err := json.Unmarshal(rr.Body.Bytes(), &synced); err != nil {
+		t.Fatalf("decode failed: %v", err)
+	}
+	if synced.OS != "Ubuntu" || synced.OSVersion != "24.04" || len(synced.Software) != 2 {
+		t.Errorf("unexpected synced VM: %+v", synced)
+	}
+
+	// Dynamic inventory
+	rrInv := httptest.NewRecorder()
+	mux.ServeHTTP(rrInv, httptest.NewRequest("GET", "/api/ansible/inventory", nil))
+	if rrInv.Code != http.StatusOK {
+		t.Fatalf("expected 200 OK on /api/ansible/inventory, got %d", rrInv.Code)
+	}
+	if !strings.Contains(rrInv.Body.String(), `"10.0.0.10"`) || !strings.Contains(rrInv.Body.String(), `"prod_cluster"`) {
+		t.Errorf("unexpected inventory output: %s", rrInv.Body.String())
+	}
+}
+
+func TestBearerTokenAuth(t *testing.T) {
+	setupTestDB(t)
+	if err := CreateUser("admin", "hash"); err != nil {
+		t.Fatal(err)
+	}
+	setupCompleted.Store(true)
+	if err := SaveSetting("api_token", "ia_test_secret_token"); err != nil {
+		t.Fatal(err)
+	}
+
+	handler := AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+
+	// Valid Bearer token
+	reqValid := httptest.NewRequest("POST", "/api/vms/sync", nil)
+	reqValid.Header.Set("Authorization", "Bearer ia_test_secret_token")
+	rrValid := httptest.NewRecorder()
+	handler.ServeHTTP(rrValid, reqValid)
+	if rrValid.Code != http.StatusOK {
+		t.Errorf("expected 200 OK for valid Bearer token, got %d", rrValid.Code)
+	}
+
+	// Invalid Bearer token
+	reqBad := httptest.NewRequest("POST", "/api/vms/sync", nil)
+	reqBad.Header.Set("Authorization", "Bearer wrong")
+	rrBad := httptest.NewRecorder()
+	handler.ServeHTTP(rrBad, reqBad)
+	if rrBad.Code != http.StatusUnauthorized {
+		t.Errorf("expected 401 Unauthorized for invalid Bearer token, got %d", rrBad.Code)
+	}
+}

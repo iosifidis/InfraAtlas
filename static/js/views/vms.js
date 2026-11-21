@@ -51,9 +51,13 @@ export function renderVMs() {
     }
 
     if (filtered.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" class="text-secondary" style="text-align: center; padding: 2rem;">Δεν βρέθηκαν VMs με τα τρέχοντα κριτήρια.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" class="text-secondary" style="text-align: center; padding: 2rem;">Δεν βρέθηκαν VMs με τα τρέχοντα κριτήρια.</td></tr>`;
+        updateSelectedVMsCount();
         return;
     }
+
+    const selectAllEl = document.getElementById('vms-select-all');
+    if (selectAllEl) selectAllEl.checked = false;
 
     filtered.forEach(v => {
         const row = document.createElement('tr');
@@ -84,6 +88,9 @@ export function renderVMs() {
         }
 
         row.innerHTML = `
+            <td style="text-align: center;" onclick="event.stopPropagation();">
+                <input type="checkbox" class="vm-select-cb" value="${v.id}" onchange="updateSelectedVMsCount()">
+            </td>
             <td class="col-vm-info">
                 <div class="vm-row-flex">
                     <div class="vm-main-details">
@@ -117,6 +124,29 @@ export function renderVMs() {
     });
 
     if (window.lucide) window.lucide.createIcons({ nodes: [tbody] });
+    updateSelectedVMsCount();
+}
+
+export function toggleSelectAllVMs(checked) {
+    document.querySelectorAll('.vm-select-cb').forEach(cb => {
+        cb.checked = checked;
+    });
+    updateSelectedVMsCount();
+}
+
+export function updateSelectedVMsCount() {
+    const selected = document.querySelectorAll('.vm-select-cb:checked').length;
+    const btn = document.getElementById('btn-ansible-sync');
+    const countSpan = document.getElementById('selected-vms-count');
+    if (countSpan) countSpan.textContent = selected;
+    if (btn) {
+        if (selected > 0) btn.classList.remove('hidden');
+        else btn.classList.add('hidden');
+    }
+}
+
+export function getSelectedVMIDs() {
+    return [...document.querySelectorAll('.vm-select-cb:checked')].map(cb => parseInt(cb.value, 10)).filter(Boolean);
 }
 
 export function renderUpgradesTab() {
@@ -171,6 +201,9 @@ export function renderUpgradesTab() {
         }
 
         row.innerHTML = `
+            <td style="text-align: center;" onclick="event.stopPropagation();">
+                <input type="checkbox" class="vm-select-cb" value="${v.id}" onchange="updateSelectedVMsCount()">
+            </td>
             <td class="col-vm-info">
                 <div class="vm-row-flex">
                     <div class="vm-main-details">
@@ -222,6 +255,29 @@ export function renderUpgradesTab() {
     });
 
     if (window.lucide) window.lucide.createIcons({ nodes: [tbody] });
+    updateSelectedVMsCount();
+}
+
+export function toggleSelectAllVMs(checked) {
+    document.querySelectorAll('.vm-select-cb').forEach(cb => {
+        cb.checked = checked;
+    });
+    updateSelectedVMsCount();
+}
+
+export function updateSelectedVMsCount() {
+    const selected = document.querySelectorAll('.vm-select-cb:checked').length;
+    const btn = document.getElementById('btn-ansible-sync');
+    const countSpan = document.getElementById('selected-vms-count');
+    if (countSpan) countSpan.textContent = selected;
+    if (btn) {
+        if (selected > 0) btn.classList.remove('hidden');
+        else btn.classList.add('hidden');
+    }
+}
+
+export function getSelectedVMIDs() {
+    return [...document.querySelectorAll('.vm-select-cb:checked')].map(cb => parseInt(cb.value, 10)).filter(Boolean);
 }
 
 export function toggleVMUpgrade(vmId, field, isChecked) {

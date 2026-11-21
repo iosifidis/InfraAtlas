@@ -1,0 +1,89 @@
+---
+- name: Sync VM OS, Specs & Software Versions to InfraAtlas
+  hosts: all
+  gather_facts: true
+  become: false
+  vars:
+    infraatlas_url: "{{ lookup('env', 'INFRAATLAS_URL') | default('http://localhost:8080', true) }}"
+    infraatlas_token: "{{ lookup('env', 'INFRAATLAS_TOKEN') | default('', true) }}"
+    tracked_packages:
+      - nginx
+      - apache2
+      - httpd
+      - php
+      - php-fpm
+      - postgresql
+      - mariadb-server
+      - mysql-server
+      - redis-server
+      - nodejs
+      - python3
+      - docker-ce
+      - docker.io
+
+  tasks:
+    - name: Gather package facts
+      ansible.builtin.package_facts:
+        manager: auto
+      ignore_errors: true
+
+    - name: Detect WordPress version if installed
+      ansible.builtin.shell: |
+        for p in /var/www/*/wp-includes/version.php /var/www/html/wp-includes/version.php /srv/*/wp-includes/version.php; do
+          if [ -f "$p" ]; then
+            grep -E "^\s*\\\$wp_version\s*=" "$p" | head -n1 | sed -E "s/.*'([^']+)'.*/\1/"
+            break
+          fi
+        done
+      args:
+        executable: /bin/bash
+      register: wp_version_out
+      changed_when: false
+      ignore_errors: true
+
+    - name: Detect Matrix Synapse version if running locally
+      ansible.builtin.uri:
+        url: http://127.0.0.1:8008/_synapse/admin/v1/server_version
+        return_content: true
+        timeout: 2
+      register: matrix_version_out
+      ignore_errors: true
+
+    - name: Build software list
+      ansible.builtin.set_fact:
+        detected_software: >-
+          {%- set items = [] -%}
+          {%- set pkgs = ansible_facts.packages | default({}) -%}
+          {%- for pkg in tracked_packages -%}
+            {%- if pkg in pkgs and (pkgs[pkg] | length) > 0 -%}
+              {%- set ver = pkgs[pkg][0].version | default('') -%}
+              {%- set _ = items.append({'name': pkg, 'version': ver, 'notes': 'package_facts'}) -%}
+            {%- endif -%}
+          {%- endfor -%}
+          {%- if wp_version_out.stdout | default('') | trim != '' -%}
+            {%- set _ = items.append({'name': 'wordpress', 'version': wp_version_out.stdout | trim, 'notes': 'wp-includes'}) -%}
+          {%- endif -%}
+          {%- if matrix_version_out is defined and matrix_version_out.json is defined and matrix_version_out.json.server_version is defined -%}
+            {%- set _ = items.append({'name': 'matrix-synapse', 'version': matrix_version_out.json.server_version, 'notes': 'admin-api'}) -%}
+          {%- endif -%}
+          {{ items }}
+
+    - name: Send inventory update to InfraAtlas
+      ansible.builtin.uri:
+        url: "{{ infraatlas_url }}/api/vms/sync"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ infraatlas_token }}"
+          Content-Type: "application/json"
+        body_format: json
+        body:
+          name: "{{ infraatlas_vm_name | default(inventory_hostname) }}"
+          ipv4: "{{ ansible_default_ipv4.address | default('') }}"
+          os: "{{ ansible_distribution | default('') }}"
+          os_version: "{{ ansible_distribution_version | default('') }}"
+          cpu: "{{ ansible_processor_vcpus | default(0) | float }}"
+          ram: "{{ ((ansible_memtotal_mb | default(0) | float) / 1024) | round(1) }}"
+          software: "{{ detected_software }}"
+        status_code: [200]
+      delegate_to: localhost
+      become: false
